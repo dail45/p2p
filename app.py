@@ -29,28 +29,21 @@ def download():
 @app.route('/accessupload/<int:count>', methods=['GET'])
 def get_access_upload(count):
     global countfiles, flagUpLoad
-    count1 = 0
-    while count1 < 2000:
-        if flagUpLoad:
-            countfiles = count
-            flagUpLoad = not flagUpLoad
-            return "1"
-        count1 += 1
-        time.sleep(0.005)
+    if flagUpLoad:
+        countfiles = count
+        flagUpLoad = not flagUpLoad
+        return "1"
     return "0"
 
 @app.route('/accessdownload')
 def get_access_download():
     global flagDownLoad, flagUpLoad
-    count1 = 0
-    while count1 < 2000:
-        if flagDownLoad:
-            flagDownLoad = not flagDownLoad
-            return {"status": 1, "count": countfiles}
-        count1 += 1
-        time.sleep(0.005)
-    flagUpLoad = True
-    return {"status": 0}
+    if flagDownLoad:
+        flagDownLoad = not flagDownLoad
+        return {"status": 1, "count": countfiles}
+    else:
+        flagUpLoad = True
+        return {"status": 0}
 
 
 @app.route("/restart")
