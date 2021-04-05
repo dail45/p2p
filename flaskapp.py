@@ -47,7 +47,7 @@ def get_access_download():
     flagUpLoad = True
     return {"status": 0}
 
-
+@app.route("/")
 @app.route("/restart")
 def restart():
     global flagDownLoad, flagUpLoad, countfiles, file
