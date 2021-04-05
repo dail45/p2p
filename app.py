@@ -5,10 +5,15 @@ import requests
 import os
 
 app = Flask(__name__)
+
 flagUpLoad = True
 flagDownLoad = False
 countfiles = 0
 file = b""
+
+@app.route("/")
+def fun():
+    return "Вроде работает."
 
 @app.route('/upload', methods=['POST'])
 def upload():
@@ -47,7 +52,7 @@ def get_access_download():
     flagUpLoad = True
     return {"status": 0}
 
-@app.route("/")
+
 @app.route("/restart")
 def restart():
     global flagDownLoad, flagUpLoad, countfiles, file
