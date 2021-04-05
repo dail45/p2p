@@ -48,6 +48,16 @@ def get_access_download():
     return {"status": 0}
 
 
+@app.route("/restart")
+def restart():
+    global flagDownLoad, flagUpLoad, countfiles, file
+    flagUpLoad = True
+    flagDownLoad = False
+    countfiles = 0
+    file = b""
+    return "restart done"
+
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
