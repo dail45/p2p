@@ -20,7 +20,7 @@ def upload():
     global file, flagDownLoad
     file = request.data
     flagDownLoad = True
-    return file
+    return "1"
 
 @app.route('/download')
 def download():
