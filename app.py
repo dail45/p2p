@@ -22,9 +22,9 @@ def upload():
     flagDownLoad = True
     return "1"
 
-@app.route('/download')
+@app.route('/download', methods=['GET', 'POST'])
 def download():
-    return file
+    return request
 
 @app.route('/accessupload/<int:count>', methods=['GET'])
 def get_access_upload(count):
