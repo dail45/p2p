@@ -104,6 +104,14 @@ def restart():
     return "restart done"
 
 
+@app.route("/log")
+def log():
+    return str({"download_link": download_link,
+            "file_chunks": file_chunks.keys(),
+            "total_length": total_length,
+            "file_chunks_number_gen": file_chunks_number_gen})
+
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
