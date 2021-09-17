@@ -90,7 +90,7 @@ def download_status():
     if num > 0:
         num += 1
     if file_chunks["counter"] < num:
-        return "alive"
+        return f"{num}, {file_chunks['counter']}"
     return "dead"
 
 
