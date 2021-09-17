@@ -71,11 +71,7 @@ def generage_download_file_chunks():
 @app.route("/await_chunk/<int:count>")
 def await_chunk(count):
     global file_chunks
-    for _ in range(20):
-        a = next(file_chunks_number_gen)
-        if a != -1:
-            break
-        time.sleep(.025)
+    a = next(file_chunks_number_gen)
     if a == -1:
         return "0"
     return f"{a}"
