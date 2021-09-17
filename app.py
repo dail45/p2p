@@ -21,7 +21,7 @@ def generator_chunks_number():
 
 
 download_link = ""
-file_chunks = {"counter": 0}
+file_chunks = {"counter": 0, "counter_upload": 0}
 total_length = 0
 file_chunks_number_gen = None
 
@@ -55,7 +55,7 @@ def generage_download_file_chunks():
     r.auto_close = False
     generator = r.stream(4*1024*1024)
     while True:
-        if len(file_chunks) < 16+1:
+        if len(file_chunks) < 16 + 2:
             try:
                 file_chunks[file_chunks["counter"] + 1] = next(generator)
                 file_chunks["counter"] += 1
@@ -81,6 +81,7 @@ def download_chunk(count):
     global file_chunks
     res = file_chunks[count]
     del file_chunks[count]
+    file_chunks["counter_upload"] += 1
     return res
 
 
@@ -89,8 +90,8 @@ def download_status():
     num = total_length // (4*1024*1024)
     if num > 0:
         num += 1
-    if file_chunks["counter"] < num:
-        return f"{num}, {file_chunks['counter']}"
+    if file_chunks["counter_upload"] < num:
+        return "alive"
     return "dead"
 
 
@@ -98,7 +99,7 @@ def download_status():
 def restart():
     global download_link, file_chunks, total_length, file_chunks_number_gen
     download_link = ""
-    file_chunks = {"counter": 0}
+    file_chunks = {"counter": 0, "counter_upload": 0}
     total_length = 0
     file_chunks_number_gen = None
     return "restart done"
@@ -108,6 +109,7 @@ def restart():
 def log():
     return str({"download_link": download_link,
             "file_chunks": file_chunks.keys(),
+            "file_chunks['counter']": file_chunks["counter"],
             "total_length": total_length,
             "file_chunks_number_gen": file_chunks_number_gen})
 
