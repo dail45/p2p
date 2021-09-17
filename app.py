@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 def generator_chunks_number():
     counter = 0
-    end = int(total_length) // (4*1024*1024) + 1
+    end = int(total_length) // (chunk_size) + 1
     while counter < end:
         if counter < file_chunks["counter"]:
             counter += 1
@@ -23,6 +23,7 @@ def generator_chunks_number():
 download_link = ""
 file_chunks = {"counter": 0, "counter_upload": 0}
 total_length = 0
+chunk_size = 4*1024*1024
 file_chunks_number_gen = None
 
 
@@ -33,11 +34,15 @@ def fun():
 
 @app.route("/download")
 def download():
-    global download_link, total_length, file_chunks_number_gen
+    global download_link, total_length, file_chunks_number_gen, chunk_size
     if download_status() == "alive":
         return "0"
     restart()
     download_link = request.args["public_key"]
+    if "Chunk-Size" in request.args:
+        chunk_size = int(request.args["Chunk-Size"])
+    else:
+        chunk_size = 4*1024*1024
     data = requests.get(download_link, stream=True)
     ret = data.headers
     total_length = int(ret["Content-Length"])
@@ -53,9 +58,9 @@ def generage_download_file_chunks():
     http = urllib3.PoolManager()
     r = http.urlopen("GET", download_link, preload_content=False)
     r.auto_close = False
-    generator = r.stream(4*1024*1024)
+    generator = r.stream(chunk_size)
     while True:
-        if len(file_chunks) < 16 + 2:
+        if len(file_chunks) < (64*1024*1024 // chunk_size) + 2:
             try:
                 file_chunks[file_chunks["counter"] + 1] = next(generator)
                 file_chunks["counter"] += 1
@@ -102,6 +107,7 @@ def restart():
     file_chunks = {"counter": 0, "counter_upload": 0}
     total_length = 0
     file_chunks_number_gen = None
+    chunk_size = 4 * 1024 * 1024
     return "restart done"
 
 
