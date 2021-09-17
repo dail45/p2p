@@ -1,58 +1,106 @@
 import time
-
+import threading
 from flask import Flask, request
 import requests
 import os
+import urllib3
 
 app = Flask(__name__)
 
-flagUpLoad = True
-flagDownLoad = False
-countfiles = 0
-file = b""
+
+def generator_chunks_number():
+    counter = 0
+    end = int(total_length) // (4*1024*1024) + 1
+    while counter < end:
+        if counter < file_chunks["counter"]:
+            counter += 1
+            print(file_chunks.keys(), file_chunks["counter"])
+            yield counter
+        else:
+            yield -1
+
+
+download_link = ""
+file_chunks = {"counter": 0}
+total_length = 0
+file_chunks_number_gen = None
+
 
 @app.route("/")
 def fun():
-    return "Вроде работает."
+    return "Ok."
 
-@app.route('/upload', methods=['POST'])
-def upload():
-    global file, flagDownLoad
-    file = request.data
-    flagDownLoad = True
-    return "1"
 
-@app.route('/download', methods=['GET', 'POST'])
+@app.route("/download")
 def download():
-    return request
+    global download_link, total_length, file_chunks_number_gen
+    if download_status() == "alive":
+        return "0"
+    restart()
+    download_link = request.args["public_key"]
+    data = requests.get(download_link, stream=True)
+    ret = data.headers
+    total_length = int(ret["Content-Length"])
+    data.close()
+    a = threading.Thread(target=generage_download_file_chunks)
+    a.start()
+    file_chunks_number_gen = generator_chunks_number()
+    return str(ret)
 
-@app.route('/accessupload/<int:count>', methods=['GET'])
-def get_access_upload(count):
-    global countfiles, flagUpLoad
-    if flagUpLoad:
-        countfiles = count
-        flagUpLoad = not flagUpLoad
-        return "1"
-    return "0"
 
-@app.route('/accessdownload')
-def get_access_download():
-    global flagDownLoad, flagUpLoad
-    if flagDownLoad:
-        flagDownLoad = not flagDownLoad
-        return {"status": 1, "count": countfiles}
-    else:
-        flagUpLoad = True
-        return {"status": 0}
+def generage_download_file_chunks():
+    global file_chunks
+    http = urllib3.PoolManager()
+    r = http.urlopen("GET", download_link, preload_content=False)
+    r.auto_close = False
+    generator = r.stream(4*1024*1024)
+    while True:
+        if len(file_chunks) < 16+1:
+            try:
+                file_chunks[file_chunks["counter"] + 1] = next(generator)
+                file_chunks["counter"] += 1
+            except StopIteration:
+                break
+
+
+@app.route("/await_chunk/<int:count>")
+def await_chunk(count):
+    global file_chunks
+    for _ in range(20):
+        a = next(file_chunks_number_gen)
+        if a != -1:
+            break
+        time.sleep(.025)
+    if a == -1:
+        return "0"
+    return f"{a}"
+
+
+@app.route("/download_chunk/<int:count>")
+def download_chunk(count):
+    global file_chunks
+    res = file_chunks[count]
+    del file_chunks[count]
+    return res
+
+
+@app.route("/downloadStatus")
+def download_status():
+    num = total_length // (4*1024*1024)
+    if num > 0:
+        num += 1
+    if file_chunks["counter"] < num:
+        return "alive"
+    return "dead"
 
 
 @app.route("/restart")
 def restart():
-    global flagDownLoad, flagUpLoad, countfiles, file
-    flagUpLoad = True
-    flagDownLoad = False
-    countfiles = 0
-    file = b""
+    global download_link, file_chunks, total_length, file_chunks_number_gen
+    download_link = ""
+    file_chunks = {"counter": 0}
+    total_length = 0
+    file_chunks_number_gen = None
     return "restart done"
 
 
