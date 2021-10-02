@@ -55,10 +55,12 @@ def download():
 
 def generage_download_file_chunks():
     global file_chunks
-    http = urllib3.PoolManager()
-    r = http.urlopen("GET", download_link, preload_content=False)
-    r.auto_close = False
-    generator = r.stream(chunk_size)
+    #http = urllib3.PoolManager()
+    #r = http.urlopen("GET", download_link, preload_content=False, verify=False)
+    #r.auto_close = False
+    time.sleep(5)
+    r = requests.get(download_link, verify=False, stream=True)
+    generator = r.iter_content(chunk_size)
     while True:
         if len(file_chunks) < (64*1024*1024 // chunk_size) + 2:
             try:
