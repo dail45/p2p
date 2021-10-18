@@ -4,6 +4,7 @@ from flask import Flask, request
 import requests
 import os
 import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 app = Flask(__name__)
 
