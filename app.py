@@ -4,7 +4,6 @@ from flask import Flask, request
 import requests
 import os
 import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 app = Flask(__name__)
 
@@ -25,6 +24,7 @@ download_link = ""
 file_chunks = {"counter": 0, "counter_upload": 0}
 total_length = 0
 chunk_size = 4*1024*1024
+THREADS = 16
 file_chunks_number_gen = None
 
 
@@ -35,7 +35,7 @@ def fun():
 
 @app.route("/download")
 def download():
-    global download_link, total_length, file_chunks_number_gen, chunk_size
+    global download_link, total_length, file_chunks_number_gen, chunk_size, THREADS
     if download_status() == "alive":
         return "0"
     restart()
@@ -44,6 +44,10 @@ def download():
         chunk_size = int(request.args["Chunk-Size"])
     else:
         chunk_size = 4*1024*1024
+    if "Threads" in request.args:
+        THREADS = int(request.args["Threads"])
+    else:
+        THREADS = 16
     data = requests.get(download_link, stream=True)
     ret = data.headers
     total_length = int(ret["Content-Length"])
@@ -63,7 +67,7 @@ def generage_download_file_chunks():
     r = requests.get(download_link, verify=False, stream=True)
     generator = r.iter_content(chunk_size)
     while True:
-        if len(file_chunks) < (64*1024*1024 // chunk_size) + 2:
+        if len(file_chunks) < ((THREADS * chunk_size) // chunk_size) + 2:
             try:
                 file_chunks[file_chunks["counter"] + 1] = next(generator)
                 file_chunks["counter"] += 1
