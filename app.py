@@ -4,7 +4,6 @@ from flask import Flask, request
 import requests
 import os
 import urllib3
-import lzma
 
 app = Flask(__name__)
 
@@ -65,7 +64,7 @@ def generage_download_file_chunks():
     while True:
         if len(file_chunks) < (64*1024*1024 // chunk_size) + 2:
             try:
-                file_chunks[file_chunks["counter"] + 1] = lzma.compress(next(generator))
+                file_chunks[file_chunks["counter"] + 1] = next(generator)
                 file_chunks["counter"] += 1
             except StopIteration:
                 break
@@ -78,14 +77,6 @@ def await_chunk(count):
     if a == -1:
         return "0"
     return f"{a}"
-
-
-@app.route("/chunkinfo/<int:count>")
-def chunkinfo(count):
-    global file_chunks
-    res = file_chunks[count]
-    data = {"num": count, "len": len(res)}
-    return data
 
 
 @app.route("/download_chunk/<int:count>")
