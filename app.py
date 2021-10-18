@@ -91,7 +91,7 @@ def download_chunk(count):
 
 @app.route("/downloadStatus")
 def download_status():
-    num = total_length // (4*1024*1024)
+    num = total_length // chunk_size
     if num > 0:
         num += 1
     if file_chunks["counter_upload"] < num:
