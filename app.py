@@ -124,8 +124,10 @@ def start(rnum):
 
 @app.route("/downloadStatus/<int:rnum>")
 def download_status(rnum):
-    log.append(f"{time.strftime('%H:%M:%S', time.gmtime(time.time()))}: downloadstatus<br>")
-    status = rnums[rnum].uploadstatus()
+    try:
+        status = rnums[rnum].uploadstatus()
+    except KeyError:
+        return "dead"
     if status == "dead" and rnums[rnum].statuskillflag:
         rnums[rnum].statuskillflag = False
         time.sleep(5)
@@ -135,13 +137,11 @@ def download_status(rnum):
 
 @app.route("/awaitChunk/<int:rnum>")
 def await_chunk(rnum):
-    log.append(f"{time.strftime('%H:%M:%S', time.gmtime(time.time()))}: await<br>")
     return rnums[rnum].upload_await()
 
 
 @app.route("/downloadChunk/<int:rnum>/<int:count>")
 def download_chunk(rnum, count):
-    log.append(f"{time.strftime('%H:%M:%S', time.gmtime(time.time()))}: chunk<br>")
     return rnums[rnum].upload(count)
 
 
