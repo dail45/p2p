@@ -67,15 +67,22 @@ class P2PTunnel:
             num += 1
         if self.UPLOADED < num:
             if len(self.STORAGE) == 0 and not self.th.is_alive():
-                self.th = threading.Thread(target=self.S2Pdownloadgenerator)
-                self.th.start()
+                if self.URL:
+                    self.th = threading.Thread(target=self.S2Pdownloadgenerator)
+                    self.th.start()
+                else:
+                    pass
             return "alive"
         return "dead"
 
     def upload_await(self):
         a = next(self.numgeneratorg)
-        if a == -1:
-            return "0"
+        while a == -1:
+            time.sleep(1)
+            try:
+                a = next(self.numgeneratorg)
+            except StopIteration:
+                return "0"
         return f"{a}"
 
     def upload(self, count):
@@ -83,6 +90,15 @@ class P2PTunnel:
         del self.STORAGE[count]
         self.UPLOADED += 1
         return res
+
+    def download_status(self):
+        while not (len(self.STORAGE) < self.RAM * self.CHUNKSIZE):
+            time.sleep(1)
+        return "1"
+
+    def download_chunk(self):
+        self.STORAGE[self.DOWNLOADED + 1] = download_chunk
+        self.DOWNLOADED += 1
 
 
 rnums = {}
@@ -144,6 +160,12 @@ def await_chunk(rnum):
 def download_chunk(rnum, count):
     return rnums[rnum].upload(count)
 
+
+@app.route("/uploadChunk/<int:rnum>", methods=['POST'])
+def upload_chunk(rnum):
+    if request.method == 'POST':
+        data = request.args["data"]
+        rnums[rnum].download_chunk(data)
 
 @app.route("/get")
 def logfunc():
