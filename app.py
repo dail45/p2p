@@ -32,12 +32,14 @@ class P2PTunnel:
         self.RAM = RAM
         self.numgeneratorg = self.numgenerator()
         self.statuskillflag = True
-        self.th = threading.Thread(target=self.S2Pdownloadgenerator)
+        self.type = "P2P"
         if self.URL:
+            self.type = "S2P"
             self.req = requests.get(URL, verify=False, stream=True)
             headers = self.req.headers
             self.r = self.req.iter_content(self.CHUNKSIZE)
             self.total_length = int(headers["Content-Length"])
+            self.th = threading.Thread(target=self.S2Pdownloadgenerator)
             self.th.start()
             return headers
         return {"id": self.id, "URL": self.URL, "chunksize": self.CHUNKSIZE, "threads": self.THREADS, "RAM": self.RAM}
@@ -66,7 +68,7 @@ class P2PTunnel:
         if num > 0:
             num += 1
         if self.UPLOADED < num:
-            if len(self.STORAGE) == 0 and not self.th.is_alive():
+            if len(self.STORAGE) == 0 and self.type == "S2P" and not self.th.is_alive():
                 if self.URL:
                     self.th = threading.Thread(target=self.S2Pdownloadgenerator)
                     self.th.start()
