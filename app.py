@@ -20,6 +20,11 @@ class P2PTunnel:
     STORAGE = {}
     DOWNLOADED = 0
     UPLOADED = 0
+    
+    def json(self):
+        return {"total_length": self.total_length, "DOWNLOADED": self.DOWNLOADED, "UPLOADED": self.UPLOADED,
+                "id": self.id, "URL": self.URL, "CHUNKSIZE": self.CHUNKSIZE, "THREADS": self.THREADS,
+                "RAM": self.RAM, "type": self.type}
 
     def __init__(self):
         pass
@@ -183,6 +188,11 @@ def upload_chunk(rnum):
 @app.route("/uploadStatus/<int:rnum>")
 def upload_status(rnum):
     return rnums[rnum].download_status()
+
+
+@app.route("/logs/<int:rnum>")
+def logs(rnum):
+    return rnums[rnum].json()
 
 
 if __name__ == '__main__':
