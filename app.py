@@ -20,7 +20,7 @@ class P2PTunnel:
     STORAGE = {}
     DOWNLOADED = 0
     UPLOADED = 0
-    
+
     def json(self):
         return {"total_length": self.total_length, "DOWNLOADED": self.DOWNLOADED, "UPLOADED": self.UPLOADED,
                 "id": self.id, "URL": self.URL, "CHUNKSIZE": self.CHUNKSIZE, "THREADS": self.THREADS,
@@ -53,7 +53,7 @@ class P2PTunnel:
         counter = 0
         end = int(self.total_length) // self.CHUNKSIZE + 1
         while counter < end:
-            if counter < self.DOWNLOADED:
+            if counter < self.UPLOADED:
                 counter += 1
                 yield counter
             else:
