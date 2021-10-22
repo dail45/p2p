@@ -53,9 +53,10 @@ class P2PTunnel:
         counter = 0
         end = int(self.total_length) // self.CHUNKSIZE + 1
         while counter < end:
-            if counter < self.UPLOADED:
-                counter += 1
-                yield counter
+            if self.DOWNLOADED > self.UPLOADED:
+                if counter < self.DOWNLOADED:
+                    counter += 1
+                    yield counter
             else:
                 yield -1
 
