@@ -76,7 +76,7 @@ class P2PTunnel:
         return "dead"
 
     def upload_await(self):
-        a = next(self.numgeneratorg)
+        a = -1
         while a == -1:
             time.sleep(1)
             try:
