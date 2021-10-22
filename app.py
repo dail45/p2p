@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v2"
+    return "p2p-tunnel v3"
 
 
 class P2PTunnel:
@@ -96,9 +96,12 @@ class P2PTunnel:
             time.sleep(1)
         return "1"
 
-    def download_chunk(self):
-        self.STORAGE[self.DOWNLOADED + 1] = download_chunk
+    def download_chunk(self, data):
+        self.STORAGE[self.DOWNLOADED + 1] = data
         self.DOWNLOADED += 1
+
+    def download_info(self, total_length):
+        self.total_length = total_length
 
 
 rnums = {}
@@ -161,17 +164,25 @@ def download_chunk(rnum, count):
     return rnums[rnum].upload(count)
 
 
-@app.route("/uploadChunk/<int:rnum>", methods=['POST'])
+@app.route("/uploadInfo/<int:rnum>", methods=['GET', 'POST'])
+def upload_info(rnum):
+    total_length = int(request.args["total_length"])
+    rnums[rnum].download_info(total_length)
+    return "0"
+
+
+@app.route("/uploadChunk/<int:rnum>", methods=['GET', 'POST'])
 def upload_chunk(rnum):
-    if request.method == 'POST':
-        data = request.args["data"]
-        rnums[rnum].download_chunk(data)
+    data = request.data
+    rnums[rnum].download_chunk(data)
+    return "0"
 
-@app.route("/get")
-def logfunc():
-    return str(log)
 
-log = []
+@app.route("/uploadStatus/<int:rnum>")
+def upload_status(rnum):
+    return rnums[rnum].download_status()
+
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
