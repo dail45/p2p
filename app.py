@@ -32,12 +32,12 @@ class P2PTunnel:
         self.RAM = RAM
         self.numgeneratorg = self.numgenerator()
         self.statuskillflag = True
+        self.th = threading.Thread(target=self.S2Pdownloadgenerator)
         if self.URL:
             self.req = requests.get(URL, verify=False, stream=True)
             headers = self.req.headers
             self.r = self.req.iter_content(self.CHUNKSIZE)
             self.total_length = int(headers["Content-Length"])
-            self.th = threading.Thread(target=self.S2Pdownloadgenerator)
             self.th.start()
             return headers
         return {"id": self.id, "URL": self.URL, "chunksize": self.CHUNKSIZE, "threads": self.THREADS, "RAM": self.RAM}
