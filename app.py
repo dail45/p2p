@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v10"
+    return "p2p-tunnel v11"
 
 
 class P2PTunnel:
@@ -40,7 +40,7 @@ class P2PTunnel:
         self.THREADS = THREADS
         self.RAM = RAM
         self.numgenflag = False
-        self.statuskillflag = True
+        self.statuskillflag = False
         self.type = "P2P"
         if self.URL:
             self.type = "S2P"
@@ -94,6 +94,8 @@ class P2PTunnel:
     def upload(self, count):
         res = self.STORAGE[count]
         del self.STORAGE[count]
+        if self.DOWNLOADED == self.UPLOADED:
+            self.statuskillflag = True
         return res
 
     def download_status(self):
@@ -124,6 +126,14 @@ def registration():
 @app.route("/kill/<int:rnum>")
 def kill(rnum):
     del rnums[rnum]
+
+
+@app.route("/gtrns")
+def getallrnums():
+    if rnums:
+        return [k for k, v in rnums.items()]
+    else:
+        return "0"
 
 
 @app.route("/start/<int:rnum>")
