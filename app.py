@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v12"
+    return "p2p-tunnel v13"
 
 
 class P2PTunnel:
@@ -78,15 +78,11 @@ class P2PTunnel:
 
     def upload_await(self):
         end = int(self.total_length) // self.CHUNKSIZE + 1
-        while self.numgenflag:
-            time.sleep(.1)
-        self.numgenflag = True
         while self.UPLOADED < end:
             if self.UPLOADED < self.DOWNLOADED:
                 self.lock.acquire()
                 num = max(self.UPLOADEDLIST) + 1
                 self.UPLOADEDLIST.append(num)
-                self.numgenflag = False
                 self.UPLOADED += 1
                 self.lock.release()
                 return str(num)
