@@ -55,11 +55,10 @@ class P2PTunnel:
         end = int(self.total_length) // self.CHUNKSIZE + 1
         while self.UPLOADED < end:
             if self.UPLOADED < self.DOWNLOADED:
+                self.UPLOADED += 1
                 yield self.UPLOADED
             else:
                 yield -1
-
-        
 
     def S2Pdownloadgenerator(self):
         if self.URL:
@@ -97,7 +96,6 @@ class P2PTunnel:
     def upload(self, count):
         res = self.STORAGE[count]
         del self.STORAGE[count]
-        self.UPLOADED += 1
         return res
 
     def download_status(self):
