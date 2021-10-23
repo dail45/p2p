@@ -12,26 +12,24 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v17"
+    return "p2p-tunnel v18"
 
 
 class P2PTunnel:
-    total_length = 0
-    STORAGE = {}
-    STORAGELIST = []
-    DOWNLOADED = 0
-    UPLOADED = 0
-    LOGS = []
-    """DOWNLOADED: from S or P >>> STORAGE"""
-    """UPLOADED: from STORAGE >>> P"""
-
     def json(self):
         return {"total_length": self.total_length, "DOWNLOADED": self.DOWNLOADED, "UPLOADED": self.UPLOADED,
                 "id": self.id, "URL": self.URL, "CHUNKSIZE": self.CHUNKSIZE, "THREADS": self.THREADS,
                 "RAM": self.RAM, "type": self.type, "STORAGELIST": self.STORAGELIST}
 
     def __init__(self):
-        pass
+        """DOWNLOADED: from S or P >>> STORAGE"""
+        """UPLOADED: from STORAGE >>> P"""
+        self.total_length = 0
+        self.STORAGE = {}
+        self.STORAGELIST = []
+        self.DOWNLOADED = 0
+        self.UPLOADED = 0
+        self.LOGS = []
 
     def init(self, id, CHUNKSIZE=2**20*4, THREADS=16, RAM=2**20*64, URL=None):
         self.id = id
