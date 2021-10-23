@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v8"
+    return "p2p-tunnel v9"
 
 
 class P2PTunnel:
@@ -39,7 +39,6 @@ class P2PTunnel:
         self.CHUNKSIZE = CHUNKSIZE
         self.THREADS = THREADS
         self.RAM = RAM
-        self.numgeneratorg = self.numgenerator()
         self.numgenflag = False
         self.statuskillflag = True
         self.type = "P2P"
@@ -54,18 +53,6 @@ class P2PTunnel:
             return headers
         return {"id": self.id, "URL": self.URL, "chunksize": self.CHUNKSIZE, "threads": self.THREADS, "RAM": self.RAM}
 
-    def numgenerator(self):
-        end = int(self.total_length) // self.CHUNKSIZE + 1
-        while self.numgenflag:
-            time.sleep(.1)
-        self.numgenflag = True
-        while self.UPLOADED < end:
-            if self.UPLOADED < self.DOWNLOADED:
-                self.UPLOADED += 1
-                self.numgenflag = False
-                yield self.UPLOADED
-            else:
-                yield -1
 
     def S2Pdownloadgenerator(self):
         if self.URL:
@@ -100,6 +87,7 @@ class P2PTunnel:
                 num = max(self.UPLOADEDLIST) + 1
                 self.UPLOADEDLIST.append(num)
                 self.numgetflag = False
+                self.UPLOADED += 1
                 return str(num)
         return "0"
 
@@ -143,7 +131,7 @@ def start(rnum):
     id = rnum
     CHUNKSIZE = 2 ** 20 * 4
     THREADS = 16
-    RAM = 2 ** 20 * 12
+    RAM = 2 ** 20 * 64
     URL = None
     args = request.args
     if "CHUNSKSIZE" in args:
