@@ -65,6 +65,8 @@ class P2PTunnel:
         num = self.total_length // self.CHUNKSIZE
         if num > 0:
             num += 1
+        if self.total_length > 0:
+            num = 1
         if self.UPLOADED < num:
             if len(self.STORAGE) == 0 and self.type == "S2P" and not self.th.is_alive():
                 if self.URL:
