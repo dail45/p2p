@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v3"
+    return "p2p-tunnel v6"
 
 
 class P2PTunnel:
@@ -38,6 +38,7 @@ class P2PTunnel:
         self.THREADS = THREADS
         self.RAM = RAM
         self.numgeneratorg = self.numgenerator()
+        self.numgenflag = False
         self.statuskillflag = True
         self.type = "P2P"
         if self.URL:
@@ -53,9 +54,13 @@ class P2PTunnel:
 
     def numgenerator(self):
         end = int(self.total_length) // self.CHUNKSIZE + 1
+        while self.numgenflag:
+            time.sleep(.1)
+        self.numgenflag = True
         while self.UPLOADED < end:
             if self.UPLOADED < self.DOWNLOADED:
                 self.UPLOADED += 1
+                self.numgenflag = False
                 yield self.UPLOADED
             else:
                 yield -1
