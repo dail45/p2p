@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v7"
+    return "p2p-tunnel v8"
 
 
 class P2PTunnel:
@@ -20,6 +20,7 @@ class P2PTunnel:
     STORAGE = {}
     DOWNLOADED = 0
     UPLOADED = 0
+    UPLOADEDLIST = [0]
     LOGS = []
     """DOWNLOADED: from S or P >>> STORAGE"""
     """UPLOADED: from STORAGE >>> P"""
@@ -27,7 +28,7 @@ class P2PTunnel:
     def json(self):
         return {"total_length": self.total_length, "DOWNLOADED": self.DOWNLOADED, "UPLOADED": self.UPLOADED,
                 "id": self.id, "URL": self.URL, "CHUNKSIZE": self.CHUNKSIZE, "THREADS": self.THREADS,
-                "RAM": self.RAM, "type": self.type}
+                "RAM": self.RAM, "type": self.type, "UPLOADEDLIST": self.UPLOADEDLIST}
 
     def __init__(self):
         pass
@@ -90,14 +91,17 @@ class P2PTunnel:
         return "dead"
 
     def upload_await(self):
-        a = -1
-        while a == -1:
-            time.sleep(1)
-            try:
-                a = next(self.numgeneratorg)
-            except StopIteration:
-                return "0"
-        return f"{a}"
+        end = int(self.total_length) // self.CHUNKSIZE + 1
+        while self.numgenflag:
+            time.sleep(.1)
+        self.numgenflag = True
+        while self.UPLOADED < end:
+            if self.UPLOADED < self.DOWNLOADED:
+                num = max(self.UPLOADEDLIST) + 1
+                self.UPLOADEDLIST.append(num)
+                self.numgetflag = False
+                return str(num)
+        return "0"
 
     def upload(self, count):
         res = self.STORAGE[count]
@@ -139,7 +143,7 @@ def start(rnum):
     id = rnum
     CHUNKSIZE = 2 ** 20 * 4
     THREADS = 16
-    RAM = 2 ** 20 * 64
+    RAM = 2 ** 20 * 12
     URL = None
     args = request.args
     if "CHUNSKSIZE" in args:
