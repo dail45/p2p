@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v9"
+    return "p2p-tunnel v10"
 
 
 class P2PTunnel:
@@ -86,7 +86,7 @@ class P2PTunnel:
             if self.UPLOADED < self.DOWNLOADED:
                 num = max(self.UPLOADEDLIST) + 1
                 self.UPLOADEDLIST.append(num)
-                self.numgetflag = False
+                self.numgenflag = False
                 self.UPLOADED += 1
                 return str(num)
         return "0"
@@ -129,9 +129,10 @@ def kill(rnum):
 @app.route("/start/<int:rnum>")
 def start(rnum):
     id = rnum
-    CHUNKSIZE = 2 ** 20 * 4
+    Mb = 2 ** 20
+    CHUNKSIZE = 4*Mb
     THREADS = 16
-    RAM = 2 ** 20 * 64
+    RAM = 64*Mb
     URL = None
     args = request.args
     if "CHUNSKSIZE" in args:
