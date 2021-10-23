@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v16"
+    return "p2p-tunnel v17"
 
 
 class P2PTunnel:
@@ -28,7 +28,7 @@ class P2PTunnel:
     def json(self):
         return {"total_length": self.total_length, "DOWNLOADED": self.DOWNLOADED, "UPLOADED": self.UPLOADED,
                 "id": self.id, "URL": self.URL, "CHUNKSIZE": self.CHUNKSIZE, "THREADS": self.THREADS,
-                "RAM": self.RAM, "type": self.type, "UPLOADEDLIST": self.UPLOADEDLIST}
+                "RAM": self.RAM, "type": self.type, "STORAGELIST": self.STORAGELIST}
 
     def __init__(self):
         pass
