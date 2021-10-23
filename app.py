@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v3"
+    return "p2p-tunnel v5"
 
 
 class P2PTunnel:
@@ -20,6 +20,8 @@ class P2PTunnel:
     STORAGE = {}
     DOWNLOADED = 0
     UPLOADED = 0
+    """DOWNLOADED: from S or P >>> STORAGE"""
+    """UPLOADED: from STORAGE >>> P"""
 
     def json(self):
         return {"total_length": self.total_length, "DOWNLOADED": self.DOWNLOADED, "UPLOADED": self.UPLOADED,
@@ -50,13 +52,10 @@ class P2PTunnel:
         return {"id": self.id, "URL": self.URL, "chunksize": self.CHUNKSIZE, "threads": self.THREADS, "RAM": self.RAM}
 
     def numgenerator(self):
-        counter = 0
         end = int(self.total_length) // self.CHUNKSIZE + 1
-        while counter < end:
-            if self.DOWNLOADED > self.UPLOADED:
-                if counter < self.DOWNLOADED:
-                    counter += 1
-                    yield counter
+        while self.UPLOADED < end:
+            if self.UPLOADED < self.DOWNLOADED:
+                yield self.UPLOADED + 1
             else:
                 yield -1
 
