@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v6"
+    return "p2p-tunnel v7"
 
 
 class P2PTunnel:
@@ -20,6 +20,7 @@ class P2PTunnel:
     STORAGE = {}
     DOWNLOADED = 0
     UPLOADED = 0
+    LOGS = []
     """DOWNLOADED: from S or P >>> STORAGE"""
     """UPLOADED: from STORAGE >>> P"""
 
@@ -104,7 +105,7 @@ class P2PTunnel:
         return res
 
     def download_status(self):
-        while not (len(self.STORAGE) < self.RAM * self.CHUNKSIZE):
+        while not (len(self.STORAGE) * self.CHUNKSIZE < self.RAM):
             time.sleep(1)
         return "1"
 
@@ -138,7 +139,7 @@ def start(rnum):
     id = rnum
     CHUNKSIZE = 2 ** 20 * 4
     THREADS = 16
-    RAM = 2 ** 20 * 64
+    RAM = 2 ** 20 * 12
     URL = None
     args = request.args
     if "CHUNSKSIZE" in args:
