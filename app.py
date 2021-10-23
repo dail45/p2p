@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v11"
+    return "p2p-tunnel v12"
 
 
 class P2PTunnel:
@@ -39,9 +39,9 @@ class P2PTunnel:
         self.CHUNKSIZE = CHUNKSIZE
         self.THREADS = THREADS
         self.RAM = RAM
-        self.numgenflag = False
         self.statuskillflag = False
         self.type = "P2P"
+        self.lock = threading.Lock()
         if self.URL:
             self.type = "S2P"
             self.req = requests.get(URL, verify=False, stream=True)
@@ -52,7 +52,6 @@ class P2PTunnel:
             self.th.start()
             return headers
         return {"id": self.id, "URL": self.URL, "chunksize": self.CHUNKSIZE, "threads": self.THREADS, "RAM": self.RAM}
-
 
     def S2Pdownloadgenerator(self):
         if self.URL:
@@ -84,10 +83,12 @@ class P2PTunnel:
         self.numgenflag = True
         while self.UPLOADED < end:
             if self.UPLOADED < self.DOWNLOADED:
+                self.lock.acquire()
                 num = max(self.UPLOADEDLIST) + 1
                 self.UPLOADEDLIST.append(num)
                 self.numgenflag = False
                 self.UPLOADED += 1
+                self.lock.release()
                 return str(num)
         return "0"
 
