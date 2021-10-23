@@ -139,7 +139,7 @@ def start(rnum):
     id = rnum
     CHUNKSIZE = 2 ** 20 * 4
     THREADS = 16
-    RAM = 2 ** 20 * 12
+    RAM = 2 ** 20 * 64
     URL = None
     args = request.args
     if "CHUNSKSIZE" in args:
