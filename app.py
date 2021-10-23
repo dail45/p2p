@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v13"
+    return "p2p-tunnel v14"
 
 
 class P2PTunnel:
@@ -81,7 +81,9 @@ class P2PTunnel:
         while self.UPLOADED < end:
             if self.UPLOADED < self.DOWNLOADED:
                 self.lock.acquire()
-                num = max(self.UPLOADEDLIST) + 1
+                #num = max(self.UPLOADEDLIST) + 1
+                nums = [k for k in self.STORAGE.keys()]
+                num = min(nums)
                 self.UPLOADEDLIST.append(num)
                 self.UPLOADED += 1
                 self.lock.release()
