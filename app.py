@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v5"
+    return "p2p-tunnel v3"
 
 
 class P2PTunnel:
@@ -55,9 +55,11 @@ class P2PTunnel:
         end = int(self.total_length) // self.CHUNKSIZE + 1
         while self.UPLOADED < end:
             if self.UPLOADED < self.DOWNLOADED:
-                yield self.UPLOADED + 1
+                yield self.UPLOADED
             else:
                 yield -1
+
+        
 
     def S2Pdownloadgenerator(self):
         if self.URL:
