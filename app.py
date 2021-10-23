@@ -12,15 +12,15 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v14"
+    return "p2p-tunnel v15"
 
 
 class P2PTunnel:
     total_length = 0
     STORAGE = {}
+    STORAGELIST = []
     DOWNLOADED = 0
     UPLOADED = 0
-    UPLOADEDLIST = [0]
     LOGS = []
     """DOWNLOADED: from S or P >>> STORAGE"""
     """UPLOADED: from STORAGE >>> P"""
@@ -58,6 +58,7 @@ class P2PTunnel:
             while len(self.STORAGE) < self.RAM * self.CHUNKSIZE:
                 try:
                     self.STORAGE[self.DOWNLOADED + 1] = next(self.r)
+                    self.STORAGELIST.append(self.DOWNLOADED + 1)
                     self.DOWNLOADED += 1
                 except StopIteration:
                     break
@@ -80,14 +81,18 @@ class P2PTunnel:
         end = int(self.total_length) // self.CHUNKSIZE + 1
         while self.UPLOADED < end:
             if self.UPLOADED < self.DOWNLOADED:
-                self.lock.acquire()
                 #num = max(self.UPLOADEDLIST) + 1
-                nums = [k for k in self.STORAGE.keys()]
-                num = min(nums)
-                self.UPLOADEDLIST.append(num)
-                self.UPLOADED += 1
-                self.lock.release()
-                return str(num)
+                #nums = [k for k in self.STORAGE.keys()]
+                #num = min(nums)
+                try:
+                    if len(self.STORAGELIST) > 0:
+                        self.lock.acquire()
+                        num = self.STORAGELIST.pop(0)
+                        self.UPLOADED += 1
+                        self.lock.release()
+                        return str(num)
+                except Exception:
+                    pass
         return "0"
 
     def upload(self, count):
@@ -103,8 +108,9 @@ class P2PTunnel:
         return "1"
 
     def download_chunk(self, data):
-        self.STORAGE[self.DOWNLOADED + 1] = data
         self.DOWNLOADED += 1
+        self.STORAGE[self.DOWNLOADED] = data
+        self.STORAGELIST.append(self.DOWNLOADED)
 
     def download_info(self, total_length):
         self.total_length = total_length
