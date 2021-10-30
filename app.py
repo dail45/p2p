@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v18"
+    return "p2p-tunnel v11"
 
 
 class P2PTunnel:
@@ -74,6 +74,8 @@ class P2PTunnel:
                     self.th.start()
                 else:
                     pass
+            return "alive"
+        elif len(self.STORAGELIST) > 0:
             return "alive"
         return "dead"
 
