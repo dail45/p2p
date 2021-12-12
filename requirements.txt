@@ -2,3 +2,4 @@ flask
 requests
 ipaddress
 bitstring
+aiohttp
