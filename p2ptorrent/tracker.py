@@ -28,9 +28,9 @@ from urllib.parse import urlencode, urlparse
 
 import requests
 
-from UDPmessage import UdpTrackerConnection, UdpTrackerAnnounce, UdpTrackerAnnounceOutput
+from p2ptorrent.UDPmessage import UdpTrackerConnection, UdpTrackerAnnounce, UdpTrackerAnnounceOutput
 import ipaddress
-import bencoding
+import p2ptorrent.bencoding
 
 
 class TrackerResponse:
