@@ -1,26 +1,23 @@
 import os
 import time
+import math
 import string
 import random
+import asyncio
 import requests
 import threading
+import p2ptorrent
 from flask import Flask, request
-
 
 app = Flask(__name__)
 
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v11"
+    return "p2p-tunnel v12"
 
 
 class P2PTunnel:
-    def json(self):
-        return {"total_length": self.total_length, "DOWNLOADED": self.DOWNLOADED, "UPLOADED": self.UPLOADED,
-                "id": self.id, "URL": self.URL, "CHUNKSIZE": self.CHUNKSIZE, "THREADS": self.THREADS,
-                "RAM": self.RAM, "type": self.type, "STORAGELIST": self.STORAGELIST}
-
     def __init__(self):
         """DOWNLOADED: from S or P >>> STORAGE"""
         """UPLOADED: from STORAGE >>> P"""
@@ -31,13 +28,16 @@ class P2PTunnel:
         self.UPLOADED = 0
         self.LOGS = []
 
-    def init(self, id, CHUNKSIZE=2**20*4, THREADS=16, RAM=2**20*64, URL=None):
+    def init(self, id, CHUNKSIZE=2 ** 20 * 4, THREADS=16, RAM=2 ** 20 * 64, filename="", URL=None, TorrentData=None, pieces=None):
         self.id = id
         self.URL = URL
         self.CHUNKSIZE = CHUNKSIZE
         self.THREADS = THREADS
         self.RAM = RAM
+        self.filename = ""
         self.statuskillflag = False
+        self.TorrentData = TorrentData
+        self.pieces = pieces
         self.type = "P2P"
         self.lock = threading.Lock()
         if self.URL:
@@ -49,8 +49,29 @@ class P2PTunnel:
             self.th = threading.Thread(target=self.S2Pdownloadgenerator)
             self.th.start()
             return headers
-        return {"id": self.id, "URL": self.URL, "chunksize": self.CHUNKSIZE, "threads": self.THREADS, "RAM": self.RAM}
+        if self.TorrentData:
+            self.type = "T2P"
+            self.loop = asyncio.get_event_loop()
+            self.client = p2ptorrent.client.TorrentClient(p2ptorrent.torrent.Torrent(self.TorrentData), self)
+            self.task = self.loop.create_task(self.client.start())
+            self.th = threading.Thread(target=self.torrentThread)
+            self.th.start()
+        return {"id": self.id, "URL": self.URL, "chunksize": self.CHUNKSIZE, "threads": self.THREADS, "RAM": self.RAM,
+                "type": self.type}
 
+    # T2P часть (Torrent to peer)
+    def torrentThread(self):
+        self.loop.run_until_complete(self.task)
+
+    def get_pieces(self):
+        return self.pieces
+
+    def writeData(self, res):
+        self.DOWNLOADED += 1
+        self.STORAGE[self.DOWNLOADED] = res
+        self.STORAGELIST.append(self.DOWNLOADED)
+
+    # S2P и P2P часть (Server и Peer to peer)
     def S2Pdownloadgenerator(self):
         if self.URL:
             while len(self.STORAGE) < self.RAM * self.CHUNKSIZE:
@@ -77,16 +98,23 @@ class P2PTunnel:
             return "alive"
         elif len(self.STORAGELIST) > 0:
             return "alive"
+        elif self.UPLOADED < self.DOWNLOADED:
+            return "alive"
+        elif math.ceil(self.total_length / self.CHUNKSIZE) > self.UPLOADED:
+            return "alive"
         return "dead"
 
     def upload_await(self):
+        status = self.uploadstatus()
+        if status == "dead":
+            return "-1"
         end = int(self.total_length) // self.CHUNKSIZE + 1
         start = time.time()
         while self.UPLOADED < end:
             if self.UPLOADED < self.DOWNLOADED:
-                #num = max(self.UPLOADEDLIST) + 1
-                #nums = [k for k in self.STORAGE.keys()]
-                #num = min(nums)
+                # num = max(self.UPLOADEDLIST) + 1
+                # nums = [k for k in self.STORAGE.keys()]
+                # num = min(nums)
                 if time.time() - start > 20:
                     return "0"
                 try:
@@ -112,16 +140,27 @@ class P2PTunnel:
             time.sleep(1)
         return "1"
 
-    def download_chunk(self, data):
+    def download_chunk(self, data, index):
         self.DOWNLOADED += 1
-        self.STORAGE[self.DOWNLOADED] = data
-        self.STORAGELIST.append(self.DOWNLOADED)
+        self.STORAGE[self.DOWNLOADED if not index else index] = data
+        self.STORAGELIST.append(self.DOWNLOADED if not index else index)
 
     def download_info(self, total_length):
         self.total_length = total_length
 
+    def get_filename(self):
+        return self.filename
+
+    def json(self):
+        return {"total_length": self.total_length, "DOWNLOADED": self.DOWNLOADED, "UPLOADED": self.UPLOADED,
+                "id": self.id, "URL": self.URL, "CHUNKSIZE": self.CHUNKSIZE, "THREADS": self.THREADS,
+                "RAM": self.RAM, "type": self.type, "STORAGELIST": self.STORAGELIST,
+                "chunks": math.ceil(self.total_length / self.CHUNKSIZE)}
+
 
 rnums = {}
+
+
 @app.route("/reg")
 def registration():
     nums = list(map(str, range(10)))
@@ -150,10 +189,12 @@ def getallrnums():
 def start(rnum):
     id = rnum
     Mb = 2 ** 20
-    CHUNKSIZE = 4*Mb
+    CHUNKSIZE = 4 * Mb
     THREADS = 16
-    RAM = 64*Mb
+    RAM = 64 * Mb
+    FILENAME = ""
     URL = None
+    torrentData = None
     args = request.args
     if "CHUNSKSIZE" in args:
         CHUNKSIZE = int(args["CHUNKSIZE"])
@@ -161,9 +202,13 @@ def start(rnum):
         THREADS = int(args["THREADS"])
     if "RAM" in args:
         RAM = int(args["RAM"])
+    if "FILENAME" in args:
+        FILENAME = args["FILENAME"]
     if "URL" in args:
         URL = args["URL"]
-    res = rnums[id].init(id, CHUNKSIZE, THREADS, RAM, URL)
+    if request.data:
+        torrentData = request.data
+    res = rnums[id].init(id, CHUNKSIZE, THREADS, RAM, FILENAME, URL, torrentData)
     return str(res)
 
 
@@ -207,6 +252,16 @@ def upload_chunk(rnum):
 @app.route("/uploadStatus/<int:rnum>")
 def upload_status(rnum):
     return rnums[rnum].download_status()
+
+
+@app.route("/getFilename/<int:rnum>")
+def get_filename(rnum):
+    return rnums[rnum].get_filename()
+
+
+@app.route("/info/<int:rnum>")
+def get_info(rnum):
+    return rnums[rnum].json()
 
 
 @app.route("/logs/<int:rnum>")
