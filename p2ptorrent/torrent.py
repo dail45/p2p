@@ -1,6 +1,6 @@
 from collections import namedtuple
 from hashlib import sha1
-import bencoding
+import p2ptorrent.bencoding
 import random
 import socket
 import struct
