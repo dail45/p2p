@@ -3,3 +3,4 @@ requests
 ipaddress
 errno
 signal
+bitstring
