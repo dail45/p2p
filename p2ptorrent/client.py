@@ -25,8 +25,8 @@ from asyncio import Queue
 from collections import namedtuple, defaultdict
 from hashlib import sha1
 
-from protocol import PeerConnection, REQUEST_SIZE
-from tracker import Tracker
+from p2ptorrent.protocol import PeerConnection, REQUEST_SIZE
+from p2ptorrent.tracker import Tracker
 
 # The number of max peer connections per TorrentClient
 MAX_PEER_CONNECTIONS = 40
