@@ -1,1 +1,1 @@
-from p2ptorrent import bencoding, cli, client, protocol, test, torrent, tracker, UDPmessage
+from p2ptorrent import bencoding, cli, client, protocol, torrent, tracker, UDPmessage
