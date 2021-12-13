@@ -14,7 +14,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v15"
+    return "p2p-tunnel v16"
 
 
 class P2PTunnel:
@@ -146,7 +146,7 @@ class P2PTunnel:
     def download_chunk(self, data, index):
         self.DOWNLOADED += 1
         self.STORAGE[self.DOWNLOADED if not index else int(index)] = data
-        self.STORAGELIST.append(self.DOWNLOADED if not index else index)
+        self.STORAGELIST.append(self.DOWNLOADED if not index else int(index))
 
     def download_info(self, info):
         if "total_length" in info:
