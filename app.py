@@ -196,7 +196,7 @@ def start(rnum):
     URL = None
     torrentData = None
     args = request.args
-    if "CHUNSKSIZE" in args:
+    if "CHUNKSIZE" in args:
         CHUNKSIZE = int(args["CHUNKSIZE"])
     if "THREADS" in args:
         THREADS = int(args["THREADS"])
