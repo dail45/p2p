@@ -14,7 +14,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v13"
+    return "p2p-tunnel v14"
 
 
 class P2PTunnel:
@@ -136,8 +136,11 @@ class P2PTunnel:
         return res
 
     def download_status(self):
+        start = time.time()
         while not (len(self.STORAGE) * self.CHUNKSIZE < self.RAM):
             time.sleep(1)
+            if time.time() - start > 20:
+                return "0"
         return "1"
 
     def download_chunk(self, data, index):
@@ -248,7 +251,8 @@ def upload_info(rnum):
 @app.route("/uploadChunk/<int:rnum>", methods=['GET', 'POST'])
 def upload_chunk(rnum):
     data = request.data
-    rnums[rnum].download_chunk(data)
+    args = request.args
+    rnums[rnum].download_chunk(data, args["index"] if "index" in args else None)
     return "0"
 
 
