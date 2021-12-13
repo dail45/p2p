@@ -14,7 +14,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v12"
+    return "p2p-tunnel v13"
 
 
 class P2PTunnel:
@@ -34,10 +34,10 @@ class P2PTunnel:
         self.CHUNKSIZE = CHUNKSIZE
         self.THREADS = THREADS
         self.RAM = RAM
-        self.filename = ""
         self.statuskillflag = False
         self.TorrentData = TorrentData
         self.pieces = pieces
+        self.filename = filename
         self.type = "P2P"
         self.lock = threading.Lock()
         if self.URL:
@@ -145,8 +145,11 @@ class P2PTunnel:
         self.STORAGE[self.DOWNLOADED if not index else index] = data
         self.STORAGELIST.append(self.DOWNLOADED if not index else index)
 
-    def download_info(self, total_length):
-        self.total_length = total_length
+    def download_info(self, info):
+        if "total_length" in info:
+            self.total_length = int(info["total_length"])
+        if "filename" in info:
+            self.filename = info["filename"]
 
     def get_filename(self):
         return self.filename
@@ -155,7 +158,7 @@ class P2PTunnel:
         return {"total_length": self.total_length, "DOWNLOADED": self.DOWNLOADED, "UPLOADED": self.UPLOADED,
                 "id": self.id, "URL": self.URL, "CHUNKSIZE": self.CHUNKSIZE, "THREADS": self.THREADS,
                 "RAM": self.RAM, "type": self.type, "STORAGELIST": self.STORAGELIST,
-                "chunks": math.ceil(self.total_length / self.CHUNKSIZE)}
+                "chunks": math.ceil(self.total_length / self.CHUNKSIZE), "filename": self.filename}
 
 
 rnums = {}
@@ -237,8 +240,8 @@ def download_chunk(rnum, count):
 
 @app.route("/uploadInfo/<int:rnum>", methods=['GET', 'POST'])
 def upload_info(rnum):
-    total_length = int(request.args["total_length"])
-    rnums[rnum].download_info(total_length)
+    info = request.args
+    rnums[rnum].download_info(info)
     return "0"
 
 
