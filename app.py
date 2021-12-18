@@ -14,7 +14,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v16"
+    return "p2p-tunnel v17"
 
 
 class P2PTunnel:
@@ -51,9 +51,6 @@ class P2PTunnel:
             return headers
         if self.TorrentData:
             self.type = "T2P"
-            self.loop = asyncio.get_event_loop()
-            self.client = p2ptorrent.client.TorrentClient(p2ptorrent.torrent.Torrent(self.TorrentData), self)
-            self.task = self.loop.create_task(self.client.start())
             self.th = threading.Thread(target=self.torrentThread)
             self.th.start()
         return {"id": self.id, "URL": self.URL, "chunksize": self.CHUNKSIZE, "threads": self.THREADS, "RAM": self.RAM,
@@ -61,12 +58,18 @@ class P2PTunnel:
 
     # T2P часть (Torrent to peer)
     def torrentThread(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        self.loop = asyncio.get_event_loop()
+        self.client = p2ptorrent.client.TorrentClient(p2ptorrent.torrent.Torrent(self.TorrentData), self)
+        self.task = self.loop.create_task(self.client.start())
         self.loop.run_until_complete(self.task)
 
     def get_pieces(self):
         return self.pieces
 
     def writeData(self, res):
+        print(res[0], res[2])
         self.DOWNLOADED += 1
         self.STORAGE[self.DOWNLOADED] = res
         self.STORAGELIST.append(self.DOWNLOADED)
