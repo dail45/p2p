@@ -14,7 +14,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v16"
+    return "p2p-tunnel v18"
 
 
 class P2PTunnel:
@@ -45,7 +45,10 @@ class P2PTunnel:
             self.req = requests.get(URL, verify=False, stream=True)
             headers = self.req.headers
             self.r = self.req.iter_content(self.CHUNKSIZE)
-            self.total_length = int(headers["Content-Length"])
+            try:
+                self.total_length = int(headers["Content-Length"])
+            except Exception:
+                pass
             self.th = threading.Thread(target=self.S2Pdownloadgenerator)
             self.th.start()
             return headers
