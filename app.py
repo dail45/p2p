@@ -14,7 +14,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v18"
+    return "p2p-tunnel v19"
 
 
 class P2PTunnel:
@@ -40,9 +40,10 @@ class P2PTunnel:
         self.filename = filename
         self.type = "P2P"
         self.lock = threading.Lock()
+        self.headers = {"user-agent": "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36"}
         if self.URL:
             self.type = "S2P"
-            self.req = requests.get(URL, verify=False, stream=True)
+            self.req = requests.get(URL, verify=False, stream=True, headers=self.headers)
             headers = self.req.headers
             self.r = self.req.iter_content(self.CHUNKSIZE)
             try:
