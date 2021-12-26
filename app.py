@@ -15,7 +15,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v22"
+    return "p2p-tunnel v23"
 
 
 class P2PTunnel:
@@ -62,7 +62,7 @@ class P2PTunnel:
                     headers = self.req.headers
                     self.r = self.req.iter_content(self.CHUNKSIZE)
                 else:
-                    return "-1"
+                    return "-2"
             else:
                 self.req = self.session.get(URL, verify=False, stream=True, headers=self.headers)
                 headers = self.req.headers
