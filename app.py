@@ -15,7 +15,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v23"
+    return "p2p-tunnel v24"
 
 
 class P2PTunnel:
@@ -54,11 +54,11 @@ class P2PTunnel:
                         file_id = chunk
                 if file_id == "":
                     return "-1"
-                self.r = self.session.get(DOWNLOAD_URL, params={'id': file_id}, stream=True)
+                self.r = self.session.get(DOWNLOAD_URL, params={'id': file_id}, stream=True, headers=self.headers)
                 token = self._get_confirm_token(self.r)
                 if token:
                     params = {'id': file_id, 'confirm': token}
-                    self.req = self.session.get(DOWNLOAD_URL, params=params, stream=True)
+                    self.req = self.session.get(DOWNLOAD_URL, params=params, stream=True, headers=self.headers)
                     headers = self.req.headers
                     self.r = self.req.iter_content(self.CHUNKSIZE)
                 else:
