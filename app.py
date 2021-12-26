@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import math
 import string
@@ -14,7 +15,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v19"
+    return "p2p-tunnel v20"
 
 
 class P2PTunnel:
@@ -41,11 +42,31 @@ class P2PTunnel:
         self.type = "P2P"
         self.lock = threading.Lock()
         self.headers = {"user-agent": "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36"}
+
         if self.URL:
             self.type = "S2P"
-            self.req = requests.get(URL, verify=False, stream=True, headers=self.headers)
-            headers = self.req.headers
-            self.r = self.req.iter_content(self.CHUNKSIZE)
+            self.session = requests.Session()
+            if self.URL.startswith("https://drive.google.com") or self.URL.startswith("http://drive.google.com"):
+                DOWNLOAD_URL = 'https://docs.google.com/uc?export=download'
+                file_id = ""
+                for chunk in self.URL.split("/")[::-1]:
+                    if re.match(r"[^/]{20,}", chunk):
+                        file_id = chunk
+                if file_id == "":
+                    return "-1"
+                self.r = self.session.get(DOWNLOAD_URL, params={'id': file_id}, stream=True)
+                token = self._get_confirm_token(self.r)
+                if token:
+                    params = {'id': file_id, 'confirm': token}
+                    self.req = self.session.get(DOWNLOAD_URL, params=params, stream=True)
+                    headers = self.req.headers
+                    self.r = self.req.iter_content(self.CHUNKSIZE)
+                else:
+                    return "-1"
+            else:
+                self.req = self.session.get(URL, verify=False, stream=True, headers=self.headers)
+                headers = self.req.headers
+                self.r = self.req.iter_content(self.CHUNKSIZE)
             try:
                 self.total_length = int(headers["Content-Length"])
             except Exception:
@@ -55,9 +76,6 @@ class P2PTunnel:
             return headers
         if self.TorrentData:
             self.type = "T2P"
-            self.loop = asyncio.get_event_loop()
-            self.client = p2ptorrent.client.TorrentClient(p2ptorrent.torrent.Torrent(self.TorrentData), self)
-            self.task = self.loop.create_task(self.client.start())
             self.th = threading.Thread(target=self.torrentThread)
             self.th.start()
         return {"id": self.id, "URL": self.URL, "chunksize": self.CHUNKSIZE, "threads": self.THREADS, "RAM": self.RAM,
@@ -65,17 +83,30 @@ class P2PTunnel:
 
     # T2P часть (Torrent to peer)
     def torrentThread(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        self.loop = asyncio.get_event_loop()
+        self.client = p2ptorrent.client.TorrentClient(p2ptorrent.torrent.Torrent(self.TorrentData), self)
+        self.task = self.loop.create_task(self.client.start())
         self.loop.run_until_complete(self.task)
 
     def get_pieces(self):
         return self.pieces
 
     def writeData(self, res):
+        print(res[0], res[2])
         self.DOWNLOADED += 1
         self.STORAGE[self.DOWNLOADED] = res
         self.STORAGELIST.append(self.DOWNLOADED)
 
     # S2P и P2P часть (Server и Peer to peer)
+    @staticmethod
+    def _get_confirm_token(response):
+        for key, value in response.cookies.items():
+            if key.startswith('download_warning'):
+                return value
+        return None
+
     def S2Pdownloadgenerator(self):
         if self.URL:
             while len(self.STORAGE) < self.RAM * self.CHUNKSIZE:
