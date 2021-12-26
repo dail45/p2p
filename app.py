@@ -15,7 +15,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v21"
+    return "p2p-tunnel v22"
 
 
 class P2PTunnel:
@@ -119,8 +119,6 @@ class P2PTunnel:
 
     def uploadstatus(self):
         num = math.ceil(self.total_length / self.CHUNKSIZE)
-        #if self.total_length > 0:
-        #    num = 1
         if self.UPLOADED < num:
             if len(self.STORAGE) == 0 and self.type == "S2P" and not self.th.is_alive():
                 if self.URL:
@@ -141,7 +139,7 @@ class P2PTunnel:
         status = self.uploadstatus()
         if status == "dead":
             return "-1"
-        end = int(self.total_length) // self.CHUNKSIZE + 1
+        end = math.ceil(self.total_length / self.CHUNKSIZE)
         start = time.time()
         while self.UPLOADED < end:
             if self.UPLOADED < self.DOWNLOADED:
