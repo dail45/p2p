@@ -77,8 +77,8 @@ class Tunnel:
         self.threads = int(json.get("threads", 16))
         self.chunksize = int(json.get("chunksize", 4 * Mb))
         self.filename = json.get("filename", None)
-        if "\\" in self.filename:
-            self.filename = self.filename.split("\\")[-1]
+        if "/" in self.filename:
+            self.filename = self.filename.split("/")[-1]
         self.total_length = int(json.get("totallength", -1))
         print(json)
         if self.total_length > 0:
