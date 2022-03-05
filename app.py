@@ -5,197 +5,234 @@ import math
 import string
 import random
 import asyncio
+from logging import log
+
 import requests
 import threading
-import p2ptorrent
 from flask import Flask, request
 
 app = Flask(__name__)
+rnums = {}
+Kb = 2 ** 10
+Mb = 2 ** 20
+Total_RAM = 480 * Mb
 
 
 @app.route("/")
 def about():
-    return "p2p-tunnel v24"
+    return "p2p-tunnel2 v1"
 
 
-class P2PTunnel:
+class Tunnel:
     def __init__(self):
         """DOWNLOADED: from S or P >>> STORAGE"""
         """UPLOADED: from STORAGE >>> P"""
         self.total_length = 0
+        self.total_chunks = 0
         self.STORAGE = {}
         self.STORAGELIST = []
+        self.RESERVED = []
         self.DOWNLOADED = 0
         self.UPLOADED = 0
         self.LOGS = []
-
-    def init(self, id, CHUNKSIZE=2 ** 20 * 4, THREADS=16, RAM=2 ** 20 * 64, filename="", URL=None, TorrentData=None, pieces=None):
-        self.id = id
-        self.URL = URL
-        self.CHUNKSIZE = CHUNKSIZE
-        self.THREADS = THREADS
-        self.RAM = RAM
-        self.statuskillflag = False
-        self.TorrentData = TorrentData
-        self.pieces = pieces
-        self.filename = filename
-        self.type = "P2P"
+        self.id = None
+        self.url = None
+        self.RAM = 0
+        self.threads = 0
+        self.chunksize = 0
+        self.filename = None
+        self.type = None
+        self.sheaders = None
+        self.S2PThread = None
+        self.r = None
         self.lock = threading.Lock()
-        self.headers = {"user-agent": "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36"}
+        self.lock2 = threading.Lock()
+        self.headers = {
+            "user-agent": "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36"}
 
-        if self.URL:
-            self.type = "S2P"
-            self.session = requests.Session()
-            if self.URL.startswith("https://drive.google.com") or self.URL.startswith("http://drive.google.com"):
-                DOWNLOAD_URL = 'https://docs.google.com/uc?export=download'
-                file_id = ""
-                for chunk in self.URL.split("/")[::-1]:
-                    if re.match(r"[^/]{20,}", chunk):
-                        file_id = chunk
-                if file_id == "":
-                    return "-1"
-                self.r = self.session.get(DOWNLOAD_URL, params={'id': file_id}, stream=True, headers=self.headers)
-                token = self._get_confirm_token(self.r)
-                if token:
-                    params = {'id': file_id, 'confirm': token}
-                    self.req = self.session.get(DOWNLOAD_URL, params=params, stream=True, headers=self.headers)
-                    headers = self.req.headers
-                    self.r = self.req.iter_content(self.CHUNKSIZE)
-                else:
-                    return "-2"
+    def setrnum(self, rnum):
+        """
+        Устанавливает id для туннеля.
+        """
+        self.id = rnum
+
+    def init(self, json):
+        """
+        Принимает json, на его основе настраивает туннель.
+        """
+        self.url = json.get("url", None)
+        self.type = "S2P" if self.url else "P2P"
+        self.RAMErrorIgnore = int(json.get("RAMErrorIgnore", 0))
+        RAM = int(json.get("RAM", 64 * Mb))
+        if not self.RAMErrorIgnore:
+            mcheck = memoryCheck(RAM)
+            if mcheck is True:
+                self.RAM = RAM
             else:
-                self.req = self.session.get(URL, verify=False, stream=True, headers=self.headers)
-                headers = self.req.headers
-                self.r = self.req.iter_content(self.CHUNKSIZE)
+                rnums[self.id] = None
+                del rnums[self.id]
+                return {"RamMemoryError": mcheck}
+        else:
+            self.RAM = RAM
+        self.threads = int(json.get("threads", 16))
+        self.chunksize = int(json.get("chunksize", 4 * Mb))
+        self.filename = json.get("filename", None)
+        if "\\" in self.filename:
+            self.filename = self.filename.split("\\")[-1]
+        self.total_length = int(json.get("totallength", -1))
+        print(json)
+        if self.total_length > 0:
+            self.total_chunks = math.ceil(self.total_length / self.chunksize)
+        self.start()
+
+        return self.log("start")
+
+    def log(self, state):
+        if state == "start":
+            return {"rnum": self.id,
+                    "url": self.url,
+                    "RAM": self.RAM,
+                    "threads": self.threads,
+                    "chunksize": self.chunksize,
+                    "filename": self.filename,
+                    "startheaders": self.sheaders}
+
+    def start(self):
+        """
+        Запускает процесс скачивания файла с сервера.
+        """
+        if self.type == "S2P":
+            self.session = requests.Session()
+            self.req = self.session.get(self.url, verify=False, stream=True, headers=self.headers)
+            self.sheaders = self.req.headers
             try:
-                self.total_length = int(headers["Content-Length"])
+                self.total_length = int(self.sheaders["Content-Length"])
+                self.total_chunks = math.ceil(self.total_length / self.chunksize)
             except Exception:
                 pass
-            self.th = threading.Thread(target=self.S2Pdownloadgenerator)
-            self.th.start()
-            return headers
-        if self.TorrentData:
-            self.type = "T2P"
-            self.th = threading.Thread(target=self.torrentThread)
-            self.th.start()
-        return {"id": self.id, "URL": self.URL, "chunksize": self.CHUNKSIZE, "threads": self.THREADS, "RAM": self.RAM,
-                "type": self.type}
+            self.r = self.req.iter_content(self.chunksize)
+            self.S2PThread = threading.Thread(target=self.S2Pdownloadgenerator)
+            self.S2PThread.start()
+        elif self.type == "P2P":
+            pass
 
-    # T2P часть (Torrent to peer)
-    def torrentThread(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        self.loop = asyncio.get_event_loop()
-        self.client = p2ptorrent.client.TorrentClient(p2ptorrent.torrent.Torrent(self.TorrentData), self)
-        self.task = self.loop.create_task(self.client.start())
-        self.loop.run_until_complete(self.task)
-
-    def get_pieces(self):
-        return self.pieces
-
-    def writeData(self, res):
-        print(res[0], res[2])
-        self.DOWNLOADED += 1
-        self.STORAGE[self.DOWNLOADED] = res
-        self.STORAGELIST.append(self.DOWNLOADED)
-
-    # S2P и P2P часть (Server и Peer to peer)
-    @staticmethod
-    def _get_confirm_token(response):
-        for key, value in response.cookies.items():
-            if key.startswith('download_warning'):
-                return value
-        return None
-
+    "S2P Часть"
     def S2Pdownloadgenerator(self):
-        if self.URL:
-            while len(self.STORAGE) < self.RAM * self.CHUNKSIZE:
-                try:
-                    self.STORAGE[self.DOWNLOADED + 1] = next(self.r)
-                    self.STORAGELIST.append(self.DOWNLOADED + 1)
-                    self.DOWNLOADED += 1
-                except StopIteration:
-                    break
+        """
+        Работает в потоке.
+        Скачивает данные из iter_content.
+        Следит за переполнением заданного кол-ва ОЗУ.
+        """
+        if self.url and self.type == "S2P":
+            while self.total_length > self.UPLOADED:
+                if len(self.STORAGE) * self.chunksize < self.RAM:
+                    try:
+                        self.STORAGE[self.DOWNLOADED + 1] = next(self.r)
+                        self.STORAGELIST.append(self.DOWNLOADED + 1)
+                        self.DOWNLOADED += 1
+                    except StopIteration:
+                        break
+                else:
+                    time.sleep(0.01)
 
     def uploadstatus(self):
-        num = math.ceil(self.total_length / self.CHUNKSIZE)
-        if self.UPLOADED < num:
-            if len(self.STORAGE) == 0 and self.type == "S2P" and not self.th.is_alive():
-                if self.URL:
-                    self.th = threading.Thread(target=self.S2Pdownloadgenerator)
-                    self.th.start()
-                else:
-                    pass
+        """
+        Определяет, следует ли туннелю продолжать работу.
+        Продолжает работу если кол-во отданный чанков меньше общего кол-ва чанков
+        (полученных в прошлом/настоящем/будущем)
+        """
+        if self.UPLOADED < self.total_chunks:
             return "alive"
-        elif len(self.STORAGELIST) > 0:
+        elif len(self.STORAGELIST) > 0:  # Ненужен
             return "alive"
-        elif self.UPLOADED < self.DOWNLOADED:
+        elif self.DOWNLOADED > self.UPLOADED:  # Ненужен
             return "alive"
-        elif math.ceil(self.total_length / self.CHUNKSIZE) > self.UPLOADED:
-            return "alive"
-        return "dead"
+        else:
+            return "dead"
 
-    def upload_await(self):
+    def uploadawait(self):
+        """
+        Определяет какой чанк нужно отдать,
+        некий аналог лонгпула,
+        определяет статус туннеля и возвращает пользователю:
+        alive: работает
+        dead: не работает
+        alive-timeout: работает, но истекло время ожидания
+        dead-timeout: не работает + истекло время ожидания
+        """
         status = self.uploadstatus()
         if status == "dead":
-            return "-1"
-        end = math.ceil(self.total_length / self.CHUNKSIZE)
+            return {"status": "dead",
+                    "cnum": -1}
         start = time.time()
-        while self.UPLOADED < end:
-            if self.UPLOADED < self.DOWNLOADED:
-                # num = max(self.UPLOADEDLIST) + 1
-                # nums = [k for k in self.STORAGE.keys()]
-                # num = min(nums)
-                if time.time() - start > 20:
-                    return "0"
+        while self.total_chunks > self.UPLOADED:
+            if self.DOWNLOADED > self.UPLOADED:
+                if time.time() - start > 25:
+                    return {"status": "alive-timeout",
+                            "cnum": -1}
                 try:
                     if len(self.STORAGELIST) > 0:
                         self.lock.acquire()
                         num = self.STORAGELIST.pop(0)
                         self.UPLOADED += 1
                         self.lock.release()
-                        return str(num)
+                        return {"status": "alive",
+                                "cnum": num}
                 except Exception:
                     pass
-        return "0"
+                time.sleep(0.05)
+        return {"status": "dead-timeout",
+                "cnum": -1}
 
-    def upload(self, count):
-        res = self.STORAGE[count]
-        del self.STORAGE[count]
-        if self.DOWNLOADED == self.UPLOADED:
-            self.statuskillflag = True
+    def upload(self, cnum):
+        """
+        Отдаёт чанк информации по номеру чанка и удаляет его из хранилища
+        """
+        res = self.STORAGE[cnum]
+        del self.STORAGE[cnum]
         return res
 
-    def download_status(self):
+    "P2P Часть"
+    def downloadawait(self):
+        if self.DOWNLOADED >= self.total_chunks:
+            return {"status": "dead"}
         start = time.time()
-        while not (len(self.STORAGE) * self.CHUNKSIZE < self.RAM):
-            time.sleep(1)
-            if time.time() - start > 20:
-                return "0"
-        return "1"
+        while not((len(self.STORAGELIST) + len(self.RESERVED)) * self.chunksize < self.RAM):
+            if time.time() - start > 1:
+                return {"status": "alive-timeout", "data": [(len(self.STORAGELIST) + len(self.RESERVED)) * self.chunksize, self.RAM]}
+            if self.DOWNLOADED >= self.total_chunks:
+                return {"status": "dead"}
+            time.sleep(0.05)
+        self.lock2.acquire()
+        self.RESERVED.append(self.DOWNLOADED + 1)
+        self.lock2.release()
+        return {"status": "alive"}
 
-    def download_chunk(self, data, index):
+    def downloadchunk(self, data, json):
         self.DOWNLOADED += 1
-        self.STORAGE[self.DOWNLOADED if not index else int(index)] = data
-        self.STORAGELIST.append(self.DOWNLOADED if not index else int(index))
+        index = json.get("index", -1)
+        self.RESERVED.pop()
+        self.STORAGE[self.DOWNLOADED if index == -1 else int(index) + 1] = data
+        self.STORAGELIST.append(self.DOWNLOADED if index == -1 else int(index) + 1)
 
-    def download_info(self, info):
-        if "total_length" in info:
-            self.total_length = int(info["total_length"])
-        if "filename" in info:
-            self.filename = info["filename"]
-
-    def get_filename(self):
-        return self.filename
-
-    def json(self):
-        return {"total_length": self.total_length, "DOWNLOADED": self.DOWNLOADED, "UPLOADED": self.UPLOADED,
-                "id": self.id, "URL": self.URL, "CHUNKSIZE": self.CHUNKSIZE, "THREADS": self.THREADS,
-                "RAM": self.RAM, "type": self.type, "STORAGELIST": self.STORAGELIST,
-                "chunks": math.ceil(self.total_length / self.CHUNKSIZE), "filename": self.filename}
+    def getInfo(self):
+        return {
+            "chunksize": self.chunksize,
+            "threads": self.threads,
+            "RAM": self.RAM,
+            "filename": self.filename,
+            "totallength": self.total_length
+        }
 
 
-rnums = {}
+def memoryCheck(RAM):
+    sum_RAM = 0
+    for k, v in rnums.items():
+        sum_RAM += v.RAM
+    if RAM <= Total_RAM - sum_RAM:
+        return True
+    else:
+        return (Total_RAM - sum_RAM) - RAM
 
 
 @app.route("/reg")
@@ -204,8 +241,8 @@ def registration():
     rnum = int("".join(random.sample(nums, 4)))
     while rnum in rnums:
         rnum = int("".join(random.sample(nums, 4)))
-
-    rnums[rnum] = P2PTunnel()
+    rnums[rnum] = Tunnel()
+    rnums[rnum].setrnum(rnum)
     return str(rnum)
 
 
@@ -217,94 +254,45 @@ def kill(rnum):
 @app.route("/gtrns")
 def getallrnums():
     if rnums:
-        return [k for k, v in rnums.items()]
+        return {"rnums": [k for k, v in rnums.items()]}
     else:
-        return "0"
+        return {"rnums": None}
 
 
 @app.route("/start/<int:rnum>")
 def start(rnum):
-    id = rnum
-    Mb = 2 ** 20
-    CHUNKSIZE = 4 * Mb
-    THREADS = 16
-    RAM = 64 * Mb
-    FILENAME = ""
-    URL = None
-    torrentData = None
-    args = request.args
-    if "CHUNKSIZE" in args:
-        CHUNKSIZE = int(args["CHUNKSIZE"])
-    if "THREADS" in args:
-        THREADS = int(args["THREADS"])
-    if "RAM" in args:
-        RAM = int(args["RAM"])
-    if "FILENAME" in args:
-        FILENAME = args["FILENAME"]
-    if "URL" in args:
-        URL = args["URL"]
-    if request.data:
-        torrentData = request.data
-    res = rnums[id].init(id, CHUNKSIZE, THREADS, RAM, FILENAME, URL, torrentData)
-    return str(res)
-
-
-@app.route("/downloadStatus/<int:rnum>")
-def download_status(rnum):
-    try:
-        status = rnums[rnum].uploadstatus()
-    except KeyError:
-        return "dead"
-    if status == "dead" and rnums[rnum].statuskillflag:
-        rnums[rnum].statuskillflag = False
-        time.sleep(5)
-        kill(rnum)
-    return status
+    json = request.args
+    log = rnums[rnum].init(json)
+    return log
 
 
 @app.route("/awaitChunk/<int:rnum>")
 def await_chunk(rnum):
-    return rnums[rnum].upload_await()
+    return rnums[rnum].uploadawait()
 
 
-@app.route("/downloadChunk/<int:rnum>/<int:count>")
-def download_chunk(rnum, count):
-    return rnums[rnum].upload(count)
+@app.route("/downloadChunk/<int:rnum>/<int:cnum>")
+def download_chunk(rnum, cnum):
+    return rnums[rnum].upload(cnum)
 
 
-@app.route("/uploadInfo/<int:rnum>", methods=['GET', 'POST'])
-def upload_info(rnum):
-    info = request.args
-    rnums[rnum].download_info(info)
-    return "0"
+@app.route("/uploadawait/<int:rnum>")
+def upload_await(rnum):
+    return rnums[rnum].downloadawait()
 
 
 @app.route("/uploadChunk/<int:rnum>", methods=['GET', 'POST'])
 def upload_chunk(rnum):
     data = request.data
-    args = request.args
-    rnums[rnum].download_chunk(data, args["index"] if "index" in args else None)
-    return "0"
-
-
-@app.route("/uploadStatus/<int:rnum>")
-def upload_status(rnum):
-    return rnums[rnum].download_status()
-
-
-@app.route("/getFilename/<int:rnum>")
-def get_filename(rnum):
-    return rnums[rnum].get_filename()
+    json = request.args
+    rnums[rnum].downloadchunk(data, json)
+    return {"status": "ok"}
 
 
 @app.route("/info/<int:rnum>")
-def get_info(rnum):
-    return rnums[rnum].json()
-
-
-@app.route("/logs/<int:rnum>")
-def logs(rnum):
-    return rnums[rnum].json()
+def info(rnum):
+    info = rnums[rnum].getInfo()
+    return info
 
 
 if __name__ == '__main__':
