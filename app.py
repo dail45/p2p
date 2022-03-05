@@ -20,7 +20,7 @@ Total_RAM = 480 * Mb
 
 @app.route("/")
 def about():
-    return "p2p-tunnel2 v1"
+    return "p2p-tunnel2 v3"
 
 
 class Tunnel:
@@ -49,6 +49,11 @@ class Tunnel:
         self.lock2 = threading.Lock()
         self.headers = {
             "user-agent": "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36"}
+    
+    def json(self):
+        return {"total_length": self.total_length, "DOWNLOADED": self.DOWNLOADED, "UPLOADED": self.UPLOADED,
+                "id": self.id, "url": self.url, "chunksize": self.chunksize, "threads": self.threads,
+                "RAM": self.RAM, "type": self.type, "STORAGELIST": self.STORAGELIST}
 
     def setrnum(self, rnum):
         """
