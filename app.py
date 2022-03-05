@@ -80,7 +80,6 @@ class Tunnel:
         if "/" in self.filename:
             self.filename = self.filename.split("/")[-1]
         self.total_length = int(json.get("totallength", -1))
-        print(json)
         if self.total_length > 0:
             self.total_chunks = math.ceil(self.total_length / self.chunksize)
         self.start()
@@ -293,6 +292,13 @@ def upload_chunk(rnum):
 def info(rnum):
     info = rnums[rnum].getInfo()
     return info
+
+
+@app.route("/clear")
+def clear():
+    rnums = getallrnums()
+    for rnum in rnums:
+        kill(rnum)
 
 
 if __name__ == '__main__':
