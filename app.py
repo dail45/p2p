@@ -1,3 +1,4 @@
+import hashlib
 import os
 import re
 import time
@@ -13,6 +14,7 @@ from flask import Flask, request
 
 app = Flask(__name__)
 rnums = {}
+dnums = {}
 Kb = 2 ** 10
 Mb = 2 ** 20
 Total_RAM = 480 * Mb
@@ -20,7 +22,7 @@ Total_RAM = 480 * Mb
 
 @app.route("/")
 def about():
-    return "p2p-tunnel2 v4"
+    return "p2p-tunnel2 v8"
 
 
 class Tunnel:
@@ -202,7 +204,7 @@ class Tunnel:
             return {"status": "dead"}
         start = time.time()
         while not((len(self.STORAGELIST) + len(self.RESERVED)) * self.chunksize < self.RAM):
-            if time.time() - start > 1:
+            if time.time() - start > 25:
                 return {"status": "alive-timeout", "data": [(len(self.STORAGELIST) + len(self.RESERVED)) * self.chunksize, self.RAM]}
             if self.DOWNLOADED >= self.total_chunks:
                 return {"status": "dead"}
@@ -218,6 +220,7 @@ class Tunnel:
         self.RESERVED.pop()
         self.STORAGE[self.DOWNLOADED if index == -1 else int(index) + 1] = data
         self.STORAGELIST.append(self.DOWNLOADED if index == -1 else int(index) + 1)
+        return {"status": "ok"}
 
     def getInfo(self):
         return {
@@ -290,6 +293,10 @@ def upload_chunk(rnum):
     data = request.data
     json = request.args
     rnums[rnum].downloadchunk(data, json)
+    import sys
+    sys.stdout.write(str(json["index"]) + str([i for i in data[:16]]) + "\n")
+
+    # print(hashlib.sha256(data).hexdigest())
     return {"status": "ok"}
 
 
@@ -309,6 +316,44 @@ def clear():
     rnums = getallrnums()
     for rnum in rnums:
         kill(rnum)
+
+##################################################################
+#####                   DNUM REGISTR                        ######
+##################################################################
+
+
+@app.route("/dreg")
+def dregistration():
+    nums = list(map(str, range(10)))
+    dnum = int("".join(random.sample(nums, 4)))
+    while dnum in dnums:
+        dnum = int("".join(random.sample(nums, 4)))
+    dnums[dnum] = {}
+    return str(dnum)
+
+
+@app.route("/sendRnum/<int:dnum>")
+def sendRnum(dnum):
+    data = request.args
+    data2 = {"rnum": data["rnum"],
+            "server": data["server"]}
+    dnums[dnum] = data2
+    return {"status": "ok"}
+
+
+@app.route("/awaitRnum/<int:dnum>")
+def awaitRnum(dnum):
+    start = time.time()
+    while True:
+        if time.time() - start > 25:
+            return {"status": "timeout"}
+        if dnums[dnum]:
+            data = dnums[dnum]
+            del dnums[dnum]
+            return {"status": "ok",
+                    "data": data}
+        time.sleep(0.05)
+
 
 
 if __name__ == '__main__':
