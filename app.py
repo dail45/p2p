@@ -22,7 +22,7 @@ Total_RAM = 480 * Mb
 
 @app.route("/")
 def about():
-    return "p2p-tunnel2 v8"
+    return "p2p-tunnel2 v9"
 
 
 class Tunnel:
@@ -315,7 +315,9 @@ def json(rnum):
 def clear():
     rnums = getallrnums()
     for rnum in rnums:
-        kill(rnum)
+        del rnum
+    for k, v in rnums.items():
+        del k[v]
 
 ##################################################################
 #####                   DNUM REGISTR                        ######
