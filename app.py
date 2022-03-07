@@ -1,13 +1,7 @@
-import hashlib
 import os
-import re
 import time
 import math
-import string
 import random
-import asyncio
-from logging import log
-
 import requests
 import threading
 from flask import Flask, request
@@ -22,7 +16,7 @@ Total_RAM = 480 * Mb
 
 @app.route("/")
 def about():
-    return "p2p-tunnel2 v9"
+    return "p2p-tunnel2 v10"
 
 
 class Tunnel:
@@ -179,7 +173,7 @@ class Tunnel:
                 try:
                     if len(self.STORAGELIST) > 0:
                         self.lock.acquire()
-                        num = self.STORAGELIST.pop(0)
+                        num = self.STORAGELIST.pop(0) - 1
                         self.UPLOADED += 1
                         self.lock.release()
                         return {"status": "alive",
@@ -194,8 +188,8 @@ class Tunnel:
         """
         Отдаёт чанк информации по номеру чанка и удаляет его из хранилища
         """
-        res = self.STORAGE[cnum]
-        del self.STORAGE[cnum]
+        res = self.STORAGE[cnum + 1]
+        del self.STORAGE[cnum + 1]
         return res
 
     "P2P Часть"
@@ -293,10 +287,6 @@ def upload_chunk(rnum):
     data = request.data
     json = request.args
     rnums[rnum].downloadchunk(data, json)
-    import sys
-    sys.stdout.write(str(json["index"]) + str([i for i in data[:16]]) + "\n")
-
-    # print(hashlib.sha256(data).hexdigest())
     return {"status": "ok"}
 
 
