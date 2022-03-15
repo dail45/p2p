@@ -210,16 +210,16 @@ class Tunnel:
         self.lock2.acquire()
         if (len(self.STORAGELIST) + len(self.RESERVED) + 1) * self.chunksize > self.RAM:
             return {"status": "ram-error"}
-        self.RESERVED.append(self.DOWNLOADED + 1)
+        self.RESERVED.append(self.DOWNLOADED + 1 if len(self.RESERVED) == 0 else self.RESERVED[-1] + 1)
         self.lock2.release()
         return {"status": "alive"}
 
     def downloadchunk(self, data, json):
         index = json.get("index", -1)
         self.DOWNLOADED += 1
-        self.RESERVED.pop()
         self.STORAGE[self.DOWNLOADED if index == -1 else int(index) + 1] = data
         self.STORAGELIST.append(self.DOWNLOADED if index == -1 else int(index) + 1)
+        self.RESERVED.pop()
         return {"status": "ok"}
 
     def getInfo(self):

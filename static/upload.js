@@ -87,9 +87,17 @@ async function startThread() {
     if (threadsOn >= threads) {
       setTimeout(async () => {
         await startThread()
-      }, 500)
-      console.log("Нахуй")
+      }, 50)
       return
+    }
+    /*if (chunkSize * (chunksCounter - 1) >= file.size) {
+      doneFlag = true
+      console.log(`upload done ${uploaded} ${uploadedBytes}`)
+      break
+    }*/
+    if (file.size - chunkSize * chunksCounter <= 0) {
+      doneFlag = true
+      break
     }
     threadsOn++
     let chunk = await readChunk(chunkSize * chunksCounter, chunkSize * (chunksCounter + 1))
@@ -105,9 +113,11 @@ async function sendChunk(chunk, index) {
   while (true) {
     let r = await fetch(`/uploadawait/${rnum}`)
     let rjs = await r.json()
+    console.log(JSON.stringify(rjs))
     if (rjs["status"] === "dead") {
       doneFlag = true
       threadsOn--
+      console.log(`upload done ${uploaded} ${uploadedBytes}`)
       break
     }
     if (rjs["status"] === "alive-timeout") {
@@ -119,10 +129,11 @@ async function sendChunk(chunk, index) {
         body: chunk
       })
       uploaded++
-      uploadedBytes += chunk.size
+      uploadedBytes += chunk.length
       threadsOn--
       if (uploadedBytes === file.size) {
         doneFlag = true
+        console.log(`upload done ${uploaded} ${uploadedBytes}`)
       }
       break
     }
