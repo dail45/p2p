@@ -1,10 +1,11 @@
+import ast
 import os
 import time
 import math
 import random
 import requests
 import threading
-from flask import Flask, request
+from flask import Flask, request, render_template
 
 app = Flask(__name__)
 rnums = {}
@@ -82,6 +83,7 @@ class Tunnel:
             self.filename = self.filename.split("/")[-1]
         self.total_length = int(json.get("totallength", -1))
         if self.total_length > 0:
+            print(self.total_length, self.chunksize)
             self.total_chunks = math.ceil(self.total_length / self.chunksize)
         self.start()
 
@@ -94,6 +96,8 @@ class Tunnel:
                     "RAM": self.RAM,
                     "threads": self.threads,
                     "chunksize": self.chunksize,
+                    "totallength": self.total_length,
+                    "totalchunks": self.total_chunks if self.total_chunks else 0,
                     "filename": self.filename,
                     "startheaders": self.sheaders}
 
@@ -238,6 +242,11 @@ def memoryCheck(RAM):
         return (Total_RAM - sum_RAM) - RAM
 
 
+##################################################################
+#####                   RNUM REGISTR                        ######
+##################################################################
+
+
 @app.route("/reg")
 def registration():
     nums = list(map(str, range(10)))
@@ -246,7 +255,6 @@ def registration():
         rnum = int("".join(random.sample(nums, 4)))
     rnums[rnum] = Tunnel()
     rnums[rnum].setrnum(rnum)
-    print(rnum)
     return str(rnum)
 
 
@@ -264,9 +272,12 @@ def getallrnums():
         return {"rnums": None}
 
 
-@app.route("/start/<int:rnum>")
+@app.route("/start/<int:rnum>", methods=['GET', 'POST'])
 def start(rnum):
+    body = request.data
     json = request.args
+    if body:
+        json = ast.literal_eval(body.decode("UTF-8"))
     log = rnums[rnum].init(json)
     return log
 
@@ -350,6 +361,24 @@ def awaitRnum(dnum):
             return {"status": "ok",
                     "data": data}
         time.sleep(0.05)
+
+
+##################################################################
+#####                        VISUAL                         ######
+##################################################################
+@app.route("/p2p")
+def mainpage():
+    return render_template("p2p.html", title="p2p")
+
+
+@app.route("/download")
+def download():
+    return render_template("download.html", title="Download")
+
+
+@app.route("/upload")
+def upload():
+    return render_template("upload.html", title="Upload")
 
 
 if __name__ == '__main__':

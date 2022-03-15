@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Upload</title>
+    <script src="./static/upload.js"></script>
+    <style>* {
+        margin-top: 5px;
+        margin-bottom: 5px;
+    }</style>
+</head>
+<body>
+    <input type="file" id="uploadbtn" onclick=""><br>
+    <input type="button" value="register" id="regBtn" onclick="">
+    <span id="rnumLabel">rnum: </span><br>
+    <span>Chunksize: </span><br>
+    <input type="number" id="numberChunkSizeInput" value="4">
+    <select id="typeChunkSizeSelect">
+        <option>B</option>
+        <option>KB</option>
+        <option selected="true">MB</option>
+    </select><br>
+    <span>Threads: </span><br>
+    <input type="number" id="threadCountInput" value="16" min="1" max="64"><br>
+    <input type="button" value="init" id="initBtn"><br>
+    <canvas style="width: 50%; height: 20px; background-color: black" id="progressBar"></canvas><span id="progressBarValue"> 0%</span><br>
+    <span id="ChunksLabel">0/0Ch&nbsp;&nbsp;&nbsp;</span><span id="SizeLabel">0/0KB&nbsp;&nbsp;&nbsp;</span><span id="SpeedLabel">0KB/s</span><br>
+    <input type="button" id="startBtn" value="start">
+</body>
+</html>
