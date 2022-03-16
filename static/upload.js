@@ -78,6 +78,7 @@ async function start() {
   regBtn.disabled = true
   initBtn.disabled = true
   startBtn.disabled = true
+  renderSpeed()
   startThread()
 }
 
@@ -113,11 +114,9 @@ async function sendChunk(chunk, index) {
   while (true) {
     let r = await fetch(`/uploadawait/${rnum}`)
     let rjs = await r.json()
-    console.log(JSON.stringify(rjs))
     if (rjs["status"] === "dead") {
       doneFlag = true
       threadsOn--
-      console.log(`upload done ${uploaded} ${uploadedBytes}`)
       break
     }
     if (rjs["status"] === "alive-timeout") {
@@ -131,11 +130,10 @@ async function sendChunk(chunk, index) {
       uploaded++
       uploadedBytes += chunk.byteLength
       renderProgressBar(Math.ceil((uploadedBytes / file.size) * 100))
-      renderChunksAndSizeAndSpeed(uploaded, uploadedBytes)
+      renderChunksAndSize(uploaded, uploadedBytes)
       threadsOn--
       if (uploadedBytes === file.size) {
         doneFlag = true
-        console.log(`upload done ${uploaded} ${uploadedBytes}`)
       }
       break
     }
@@ -169,7 +167,6 @@ function renderProgressBar(value) {
       width = 1 * value
     }
     ctx.fillRect(1, 1, width, 18)
-    console.log(canvas.height, canvas.width)
   }
   if (value > 100) {
       value = 100
@@ -180,11 +177,44 @@ function renderProgressBar(value) {
   progressBarValue.innerText = `${value} %`
 }
 
-function renderChunksAndSizeAndSpeed(chunks, size) {
+function renderChunksAndSize(chunks, size) {
   chunksLabel.innerText = `${chunks}/${Math.ceil(file.size / chunkSize)}Ch  `
   var formatedSize = formatSize(file.size)
   var sizeDone = formatSize(size, power=formatedSize[2])
   sizeLabel.innerText = `${sizeDone[0]}/${formatedSize[0]}${formatedSize[1]}  `
+}
+
+var uploadSpeedArray = Array().concat()
+var lastSize = 0
+var speed = 0
+var counter = 0
+function renderSpeed(flag=false) {
+  if (flag === false) {
+    setTimeout(renderSpeed, 500, true)
+    return
+  }
+  counter++
+  uploadSpeedArray.push((uploadedBytes - lastSize) / 0.5)
+  lastSize = uploadedBytes
+  if (uploadSpeedArray.length > 6) {
+    uploadSpeedArray.shift()
+  }
+  console.log(uploadSpeedArray)
+  speed = uploadSpeedArray.reduce((partialSum, a) => partialSum + a, 0)
+  speed /= uploadSpeedArray.length
+  formatedSpeed = formatSize(speed)
+  struct = {
+    "uploadedSpeedArray": uploadSpeedArray,
+    "lastSize": lastSize,
+    "uploadedBytes": uploadedBytes,
+    "speed": speed,
+    "formatedSpeed": formatedSpeed
+  }
+  console.log(struct)
+  speedLabel.innerText = `${formatedSpeed[0]} ${formatedSpeed[1]}/s`
+  if (doneFlag === false) {
+    setTimeout(renderSpeed, 500, false)
+  }
 }
 
 
@@ -215,6 +245,7 @@ var startBtn = document.getElementById("startBtn")
 
 document.addEventListener("readystatechange", () => {
   if (document.readyState === "complete") {
+    renderProgressBar(0)
      fileBtn = document.getElementById("uploadbtn")
      regBtn = document.getElementById("regBtn")
      chunkSizeInput = document.getElementById("numberChunkSizeInput")
