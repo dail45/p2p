@@ -13,26 +13,26 @@ function strSizeFormatToInt(sizeFormat) {
   }
 }
 
-function formatSize(size) {
+function formatSize(size, power=0) {
   let newSize = size
   let typeSize = "B"
   let typeSizeInt = 0
-  if (newSize >= 1024) {
+  if (newSize >= 1024 || power > 0) {
     newSize /= 1024
     typeSize = "KB"
     typeSizeInt++
   }
-  if (newSize >= 1024) {
+  if (newSize >= 1024 || power > 1) {
     newSize /= 1024
     typeSize = "MB"
     typeSizeInt++
   }
-  if (newSize >= 1024) {
+  if (newSize >= 1024 || power > 2) {
     newSize /= 1024
     typeSize = "GB"
     typeSizeInt++
   }
-  return Array.of([newSize, typeSize, typeSizeInt])
+  return [parseFloat(newSize.toFixed(2)), typeSize, typeSizeInt]
 }
 
 async function register() {
@@ -41,7 +41,7 @@ async function register() {
   response = await fetch("/reg")
   rnum = await response.text()
   document.getElementById("rnumLabel").innerText = "rnum: " + rnum
-  setTimeout(() => {regBtn.disabled = false}, 1000)
+  setTimeout(() => {regBtn.disabled = false}, 500)
   initBtn.disabled = false
   regFlag = true
   initFlag = false
@@ -70,7 +70,7 @@ async function init() {
   })
   let log = await response.json()
   console.log(log)
-  setTimeout(() => {regBtn.disabled = false;initBtn.disabled = false}, 1000)
+  setTimeout(() => {regBtn.disabled = false;initBtn.disabled = false}, 500)
   startBtn.disabled = false
 }
 
@@ -129,7 +129,9 @@ async function sendChunk(chunk, index) {
         body: chunk
       })
       uploaded++
-      uploadedBytes += chunk.length
+      uploadedBytes += chunk.byteLength
+      renderProgressBar(Math.ceil((uploadedBytes / file.size) * 100))
+      renderChunksAndSizeAndSpeed(uploaded, uploadedBytes)
       threadsOn--
       if (uploadedBytes === file.size) {
         doneFlag = true
@@ -137,7 +139,6 @@ async function sendChunk(chunk, index) {
       }
       break
     }
-
   }
 }
 
@@ -153,31 +154,64 @@ async function readChunk(start, end) {
   })
 }
 
+function renderProgressBar(value) {
+  var canvas = document.getElementById("progressBar")
+  if (canvas.getContext) {
+    var ctx = canvas.getContext("2d")
+    ctx.fillStyle = "#BBBBBB"
+    ctx.fillRect(0, 0, canvas.width,20)
+    ctx.fillStyle = "#202020"
+    ctx.fillRect(1, 1, canvas.width - 2, 18)
+    ctx.fillStyle = "#05B8CC"
+    if (value > 100) {
+      width = 100
+    } else {
+      width = 1 * value
+    }
+    ctx.fillRect(1, 1, width, 18)
+    console.log(canvas.height, canvas.width)
+  }
+  if (value > 100) {
+      value = 100
+    } else {
+      value = 1 * value
+    }
+  var progressBarValue = document.getElementById("progressBarValue")
+  progressBarValue.innerText = `${value} %`
+}
 
-let fileFlag = false
-let regFlag = false
-let initFlag = false
-let doneFlag = false
-let rnum = 0
-let file = null
-let chunkSize = 4 * (2 ** 20)
-let threads = 16
-let threadsOn = 0
-let uploaded = 0
-let uploadedBytes = 0
-let speed = 0
-let fileBtn = document.getElementById("uploadbtn")
-let regBtn = document.getElementById("regBtn")
-let chunkSizeInput = document.getElementById("numberChunkSizeInput")
-let chunkSizeTypeInput = document.getElementById("typeChunkSizeSelect")
-let threadsInput = document.getElementById("threadCountInput")
-let initBtn = document.getElementById("initBtn")
-let progressBar = document.getElementById("progressBar")
-let progressBarValue = document.getElementById("progressBarValue")
-let chunksLabel = document.getElementById("ChunksLabel")
-let sizeLabel = document.getElementById("SizeLabel")
-let speedLabel = document.getElementById("SpeedLabel")
-let startBtn = document.getElementById("startBtn")
+function renderChunksAndSizeAndSpeed(chunks, size) {
+  chunksLabel.innerText = `${chunks}/${Math.ceil(file.size / chunkSize)}Ch  `
+  var formatedSize = formatSize(file.size)
+  var sizeDone = formatSize(size, power=formatedSize[2])
+  sizeLabel.innerText = `${sizeDone[0]}/${formatedSize[0]}${formatedSize[1]}  `
+}
+
+
+var fileFlag = false
+var regFlag = false
+var initFlag = false
+var doneFlag = false
+var rnum = 0
+var file = null
+var chunkSize = 4 * (2 ** 20)
+var threads = 16
+var threadsOn = 0
+var uploaded = 0
+var uploadedBytes = 0
+var speed = 0
+var fileBtn = document.getElementById("uploadbtn")
+var regBtn = document.getElementById("regBtn")
+var chunkSizeInput = document.getElementById("numberChunkSizeInput")
+var chunkSizeTypeInput = document.getElementById("typeChunkSizeSelect")
+var threadsInput = document.getElementById("threadCountInput")
+var initBtn = document.getElementById("initBtn")
+var progressBar = document.getElementById("progressBar")
+var progressBarValue = document.getElementById("progressBarValue")
+var chunksLabel = document.getElementById("ChunksLabel")
+var sizeLabel = document.getElementById("SizeLabel")
+var speedLabel = document.getElementById("SpeedLabel")
+var startBtn = document.getElementById("startBtn")
 
 document.addEventListener("readystatechange", () => {
   if (document.readyState === "complete") {

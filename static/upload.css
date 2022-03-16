@@ -1,0 +1,20 @@
+body {
+    background-color: #202020;
+    color: #BBBBBB;
+    border-color: #BBBBBB;
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+button {
+    background-color: #171717;
+    color: #ffffff;
+}
+button:hover {
+    border: 2px solid #707070;
+}
+button:disabled {
+    color: #505050;
+}
+button:checked {
+    background-color: #353535;
+}

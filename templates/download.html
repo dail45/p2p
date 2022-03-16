@@ -5,9 +5,27 @@
     <meta name="viewport"
           content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Download</title>
+    <title>Upload</title>
+    <script src="./static/download.js"></script>
+    <style>* {
+        margin-top: 5px;
+        margin-bottom: 5px;
+    }</style>
 </head>
 <body>
-
+    <input type="file" id="uploadbtn" onclick=""><br>
+    <span id="rnumLabel">rnum: </span><input type="number" id="rnumInput"><br>
+    <input type="button" id="searchBtn" value="Search"><br>
+    <input type="button" value="save" id="initBtn" onclick="saveto()"><br>
+    <canvas style="width: 50%; height: 20px; background-color: black" id="progressBar"></canvas><span id="progressBarValue"> 0%</span><br>
+    <span id="ChunksLabel">0/0Ch&nbsp;&nbsp;&nbsp;</span><span id="SizeLabel">0/0KB&nbsp;&nbsp;&nbsp;</span><span id="SpeedLabel">0KB/s</span><br>
+    <input type="button" id="startBtn" value="start">
 </body>
 </html>
+<script>
+    function saveto() {
+        window.navigator.msSaveOrOpenBlob(
+            "file text",
+            "1.txt")
+    }
+</script>
