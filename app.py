@@ -201,7 +201,6 @@ class Tunnel:
                                 return {"status": "alive",
                                         "findex": findex,
                                         "cindex": cindex}
-
                 except Exception:
                     pass
                 time.sleep(0.05)

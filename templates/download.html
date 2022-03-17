@@ -7,17 +7,18 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Upload</title>
     <script src="./static/download.js"></script>
+    <link href="../static/download.css" rel="stylesheet">
     <style>* {
         margin-top: 5px;
         margin-bottom: 5px;
     }</style>
 </head>
 <body>
-    <input type="file" id="uploadbtn" onclick=""><br>
+    <span>filename: </span><input type="text" id="filenameInput"><br>
     <span id="rnumLabel">rnum: </span><input type="number" id="rnumInput"><br>
     <input type="button" id="searchBtn" value="Search"><br>
-    <input type="button" value="save" id="initBtn" onclick="saveto()"><br>
-    <canvas style="width: 50%; height: 20px; background-color: black" id="progressBar"></canvas><span id="progressBarValue"> 0%</span><br>
+    <input type="button" value="save" id="saveBtn" onclick="saveto()"><br>
+    <canvas style="width: 50%; height: 20px; background-color: black" id="progressBar" height="20px" width="102px"></canvas><span id="progressBarValue"> 0%</span><br>
     <span id="ChunksLabel">0/0Ch&nbsp;&nbsp;&nbsp;</span><span id="SizeLabel">0/0KB&nbsp;&nbsp;&nbsp;</span><span id="SpeedLabel">0KB/s</span><br>
     <input type="button" id="startBtn" value="start">
 </body>
