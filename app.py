@@ -193,8 +193,14 @@ class Tunnel:
                             return {"status": "alive",
                                     "cnum": num}
                         else:
+                            findex, cindex = self.STORAGELIST.pop(0)
                             if not self.getMultifile:
-                                num = self.STORAGELIST.pop(0)
+                                return {"status": "alive",
+                                        "cnum": cindex}
+                            else:
+                                return {"status": "alive",
+                                        "findex": findex,
+                                        "cindex": cindex}
 
                 except Exception:
                     pass
