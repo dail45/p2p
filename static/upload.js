@@ -41,7 +41,7 @@ async function register() {
   response = await fetch("/reg")
   rnum = await response.text()
   document.getElementById("rnumLabel").innerText = "rnum: " + rnum
-  setTimeout(() => {regBtn.disabled = false}, 500)
+  setTimeout(() => {if (startFlag === false) {regBtn.disabled = false}}, 500)
   initBtn.disabled = false
   regFlag = true
   initFlag = false
@@ -70,11 +70,12 @@ async function init() {
   })
   let log = await response.json()
   console.log(log)
-  setTimeout(() => {regBtn.disabled = false;initBtn.disabled = false}, 500)
+  setTimeout(() => {if (startFlag === false) {regBtn.disabled = false;initBtn.disabled = false}}, 500)
   startBtn.disabled = false
 }
 
 async function start() {
+  startFlag = true
   regBtn.disabled = true
   initBtn.disabled = true
   startBtn.disabled = true
@@ -221,6 +222,7 @@ function renderSpeed(flag=false) {
 var fileFlag = false
 var regFlag = false
 var initFlag = false
+var startFlag = false
 var doneFlag = false
 var rnum = 0
 var file = null
@@ -229,7 +231,6 @@ var threads = 16
 var threadsOn = 0
 var uploaded = 0
 var uploadedBytes = 0
-var speed = 0
 var fileBtn = document.getElementById("uploadbtn")
 var regBtn = document.getElementById("regBtn")
 var chunkSizeInput = document.getElementById("numberChunkSizeInput")

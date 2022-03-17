@@ -42,6 +42,7 @@ class Tunnel:
         self.sheaders = None
         self.S2PThread = None
         self.r = None
+        self.getMultifile = False
         self.lock = threading.Lock()
         self.lock2 = threading.Lock()
         self.headers = {
@@ -79,14 +80,19 @@ class Tunnel:
         self.threads = int(json.get("threads", 16))
         self.chunksize = int(json.get("chunksize", 4 * Mb))
         self.filename = json.get("filename", None)
+        self.filenames = json.get("filenames", None)
         if "/" in self.filename:
             self.filename = self.filename.split("/")[-1]
+        if self.filenames:
+            self.filenames = list(map(lambda s: s.split("/")[-1] if "/" in s else s, self.filenames))
+        self.multifileFlag = int(json.get("multifile", 0))
         self.total_length = int(json.get("totallength", -1))
+        self.total_lengths = list(map(lambda x: int(x), json.get("totallengths", [-1])))
         if self.total_length > 0:
-            print(self.total_length, self.chunksize)
             self.total_chunks = math.ceil(self.total_length / self.chunksize)
+        if self.total_lengths:
+            self.totals_chunks = list(map(lambda x: math.ceil(x / self.chunksize), self.total_lengths))
         self.start()
-
         return self.log("start")
 
     def log(self, state):
@@ -99,7 +105,10 @@ class Tunnel:
                     "totallength": self.total_length,
                     "totalchunks": self.total_chunks if self.total_chunks else 0,
                     "filename": self.filename,
-                    "startheaders": self.sheaders}
+                    "startheaders": self.sheaders,
+                    "filenames": self.filenames,
+                    "totallengths": self.total_lengths,
+                    "totalschunks": self.totals_chunks}
 
     def start(self):
         """
@@ -177,34 +186,60 @@ class Tunnel:
                 try:
                     if len(self.STORAGELIST) > 0:
                         self.lock.acquire()
-                        num = self.STORAGELIST.pop(0) - 1
-                        self.UPLOADED += 1
-                        self.lock.release()
-                        return {"status": "alive",
-                                "cnum": num}
+                        if not self.multifileFlag:
+                            num = self.STORAGELIST.pop(0) - 1
+                            self.UPLOADED += 1
+                            self.lock.release()
+                            return {"status": "alive",
+                                    "cnum": num}
+                        else:
+                            if not self.getMultifile:
+                                num = self.STORAGELIST.pop(0)
+
                 except Exception:
                     pass
                 time.sleep(0.05)
         return {"status": "dead-timeout",
                 "cnum": -1}
 
-    def upload(self, cnum):
+    def upload(self, args):
         """
         Отдаёт чанк информации по номеру чанка и удаляет его из хранилища
         """
-        res = self.STORAGE[cnum + 1]
-        del self.STORAGE[cnum + 1]
+        res = self.STORAGE[int(args["index"]) + 1]
+        del self.STORAGE[int(args["index"]) + 1]
         return res
 
     "P2P Часть"
     def downloadawait(self):
-        if self.DOWNLOADED >= self.total_chunks:
+        def checkDead(self):
+            if not self.multifileFlag:
+                if self.DOWNLOADED >= self.total_chunks:
+                    return True
+                return False
+            else:
+                if not self.getMultifile:
+                    if self.DOWNLOADED >= self.totals_chunks[0]:
+                        return True
+                    return False
+                else:
+                    if self.DOWNLOADED >= sum(self.totals_chunks):
+                        return True
+                    return False
+        """
+        Проверяет количество доступной ОЗУ и возвращает различные статусы:
+        alive -> Всё ок
+        ram-error -> что-то пошло не так
+        alive-timeout -> всё ещё живо, но время запроса истекает
+        dead -> загрузка завершена
+        """
+        if checkDead(self):
             return {"status": "dead"}
         start = time.time()
         while (len(self.STORAGELIST) + len(self.RESERVED) + 1) * self.chunksize > self.RAM:
             if time.time() - start > 25:
                 return {"status": "alive-timeout", "data": [(len(self.STORAGELIST) + len(self.RESERVED) + 1) * self.chunksize, self.RAM]}
-            if self.DOWNLOADED >= self.total_chunks:
+            if checkDead(self):
                 return {"status": "dead"}
             time.sleep(0.05)
         self.lock2.acquire()
@@ -215,20 +250,38 @@ class Tunnel:
         return {"status": "alive"}
 
     def downloadchunk(self, data, json):
+        """
+        Сохраняет data в памяти, json хранит информацию о индексе чанка и индексе файла.
+        """
         index = json.get("index", -1)
-        self.DOWNLOADED += 1
-        self.STORAGE[self.DOWNLOADED if index == -1 else int(index) + 1] = data
-        self.STORAGELIST.append(self.DOWNLOADED if index == -1 else int(index) + 1)
-        self.RESERVED.pop()
+        if "multifile" not in json or int(json["multifile"]) == 0:
+            self.DOWNLOADED += 1
+            self.STORAGE[self.DOWNLOADED if index == -1 else int(index) + 1] = data
+            self.STORAGELIST.append(self.DOWNLOADED if index == -1 else int(index) + 1)
+            self.RESERVED.pop()
+        else:
+            findex = json["fileindex"]
+            self.DOWNLOADED += 1
+            if findex in self.STORAGE:
+                self.STORAGE[findex][index + 1] = data
+            else:
+                self.STORAGE[findex] = {index + 1: data}
+            self.STORAGELIST.append((findex, index))
+            self.RESERVED.pop()
         return {"status": "ok"}
 
-    def getInfo(self):
+    def getInfo(self, args):
+        if self.multifileFlag:
+            if "multifile" in args:
+                if args["multifile"] == 1:
+                    self.getMultifile = True
         return {
             "chunksize": self.chunksize,
             "threads": self.threads,
             "RAM": self.RAM,
             "filename": self.filename,
-            "totallength": self.total_length
+            "totallength": self.total_length,
+            "multifile": self.multifileFlag
         }
 
 
@@ -287,9 +340,10 @@ def await_chunk(rnum):
     return rnums[rnum].uploadawait()
 
 
-@app.route("/downloadChunk/<int:rnum>/<int:cnum>")
-def download_chunk(rnum, cnum):
-    return rnums[rnum].upload(cnum)
+@app.route("/downloadChunk/<int:rnum>")
+def download_chunk(rnum):
+    args = request.args
+    return rnums[rnum].upload(args)
 
 
 @app.route("/uploadawait/<int:rnum>")
@@ -307,7 +361,8 @@ def upload_chunk(rnum):
 
 @app.route("/info/<int:rnum>")
 def info(rnum):
-    info = rnums[rnum].getInfo()
+    args = request.args
+    info = rnums[rnum].getInfo(args)
     return info
 
 
