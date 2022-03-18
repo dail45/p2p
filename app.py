@@ -18,7 +18,7 @@ Total_RAM = 480 * Mb
 
 @app.route("/")
 def about():
-    return "p2p-tunnel2 v12"
+    return "p2p-tunnel2 v18"
 
 
 class Tunnel:
@@ -89,7 +89,7 @@ class Tunnel:
         self.multifileFlag = int(json.get("multifile", 0))
         self.total_length = int(json.get("totallength", -1))
         self.total_lengths = json.get("totallengths", [-1])
-        if self.total_lengths != -1:
+        if self.total_lengths != [-1]:
             self.total_lengths = list(map(lambda x: int(x), ast.literal_eval(self.total_lengths)))
         if self.total_length and self.total_length > 0:
             self.total_chunks = math.ceil(self.total_length / self.chunksize)
