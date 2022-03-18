@@ -82,17 +82,21 @@ class Tunnel:
         self.chunksize = int(json.get("chunksize", 4 * Mb))
         self.filename = json.get("filename", None)
         self.filenames = json.get("filenames", None)
-        if "/" in self.filename:
+        if self.filename and "/" in self.filename:
             self.filename = self.filename.split("/")[-1]
         if self.filenames:
-            self.filenames = list(map(lambda s: s.split("/")[-1] if "/" in s else s, self.filenames))
+            self.filenames = list(map(lambda s: s.split("/")[-1] if "/" in s else s, ast.literal_eval(self.filenames)))
         self.multifileFlag = int(json.get("multifile", 0))
         self.total_length = int(json.get("totallength", -1))
-        self.total_lengths = list(map(lambda x: int(x), json.get("totallengths", [-1])))
-        if self.total_length > 0:
+        self.total_lengths = json.get("totallengths", [-1])
+        if self.total_lengths != -1:
+            self.total_lengths = list(map(lambda x: int(x), ast.literal_eval(self.total_lengths)))
+        if self.total_length and self.total_length > 0:
             self.total_chunks = math.ceil(self.total_length / self.chunksize)
-        if self.total_lengths:
+        if self.total_lengths != -1:
             self.totals_chunks = list(map(lambda x: math.ceil(x / self.chunksize), self.total_lengths))
+        else:
+            self.totals_chunks = 0
         self.start()
         return self.log("start")
 
@@ -155,7 +159,6 @@ class Tunnel:
         Продолжает работу если кол-во отданный чанков меньше общего кол-ва чанков
         (полученных в прошлом/настоящем/будущем)
         """
-        logging.warning(f"{[{'Uploaded': self.UPLOADED, 'total_chunks': self.total_chunks, 'multifileFlag': self.multifileFlag, 'sum(total_chunks)': sum(self.totals_chunks)}]}")
         if self.UPLOADED < self.total_chunks and self.multifileFlag == 0:
             return "alive"
         elif self.multifileFlag == 1:
@@ -179,11 +182,16 @@ class Tunnel:
         dead-timeout: не работает + истекло время ожидания
         """
         status = self.uploadstatus()
+        print(status)
         if status == "dead":
             return {"status": "dead",
                     "cnum": -1}
         start = time.time()
-        while self.total_chunks > self.UPLOADED:
+        while (self.total_chunks > self.UPLOADED and self.multifileFlag == 0) or (
+                (self.multifileFlag == 1) and (
+                (self.getMultifile is True and self.UPLOADED <= sum(self.totals_chunks)
+                ) or (
+                self.getMultifile is False and self.UPLOADED <= self.totals_chunks[0]))):
             if self.DOWNLOADED > self.UPLOADED:
                 if time.time() - start > 25:
                     return {"status": "alive-timeout",
@@ -201,16 +209,19 @@ class Tunnel:
                             findex, cindex = self.STORAGELIST.pop(0)
                             if not self.getMultifile:
                                 if int(findex) != 0:
+                                    self.lock.release()
                                     return {"status": "alive-timeout",
                                             "cnum": -1}
+                                self.lock.release()
                                 return {"status": "alive",
                                         "cnum": cindex}
                             else:
+                                self.lock.release()
                                 return {"status": "alive",
                                         "findex": findex,
                                         "cnum": cindex}
-                except Exception:
-                    pass
+                except Exception as f:
+                    print(f)
                 time.sleep(0.05)
         return {"status": "dead-timeout",
                 "cnum": -1}
@@ -225,6 +236,7 @@ class Tunnel:
         else:
             res = self.STORAGE[int(args["findex"])][int(args["index"]) + 1]
             del self.STORAGE[int(args["findex"])][int(args["index"]) + 1]
+        self.UPLOADED += 1
         return res
 
     def checkDead(self):
@@ -235,14 +247,9 @@ class Tunnel:
                 return True
             return False
         else:
-            if not self.getMultifile:
-                if self.DOWNLOADED >= self.totals_chunks[0]:
-                    return True
-                return False
-            else:
-                if self.DOWNLOADED >= sum(self.totals_chunks):
-                    return True
-                return False
+            if self.DOWNLOADED >= sum(self.totals_chunks):
+                return True
+            return False
 
     "P2P Часть"
     def downloadawait(self):
@@ -274,14 +281,14 @@ class Tunnel:
         """
         Сохраняет data в памяти, json хранит информацию о индексе чанка и индексе файла.
         """
-        index = json.get("index", -1)
+        index = int(json.get("index", -1))
         if self.multifileFlag == 0:
             self.DOWNLOADED += 1
             self.STORAGE[self.DOWNLOADED if index == -1 else int(index) + 1] = data
             self.STORAGELIST.append(self.DOWNLOADED if index == -1 else int(index) + 1)
             self.RESERVED.pop()
         else:
-            findex = json["findex"]
+            findex = int(json["findex"])
             self.DOWNLOADED += 1
             if findex in self.STORAGE:
                 self.STORAGE[findex][index + 1] = data
@@ -294,7 +301,7 @@ class Tunnel:
     def getInfo(self, args):
         if self.multifileFlag:
             if "multifile" in args:
-                if args["multifile"] == 1:
+                if int(args["multifile"]) == 1:
                     self.getMultifile = True
         return {
             "chunksize": self.chunksize,
@@ -371,7 +378,9 @@ def download_chunk(rnum):
 
 @app.route("/uploadawait/<int:rnum>")
 def upload_await(rnum):
-    return rnums[rnum].downloadawait()
+    a = rnums[rnum].downloadawait()
+    logging.warning(a)
+    return a
 
 
 @app.route("/uploadChunk/<int:rnum>", methods=['GET', 'POST'])
