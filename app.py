@@ -1,4 +1,5 @@
 import ast
+import logging
 import os
 import time
 import math
@@ -154,12 +155,16 @@ class Tunnel:
         Продолжает работу если кол-во отданный чанков меньше общего кол-ва чанков
         (полученных в прошлом/настоящем/будущем)
         """
-        if self.UPLOADED < self.total_chunks:
+        logging.warning(f"{[{'Uploaded': self.UPLOADED, 'total_chunks': self.total_chunks, 'multifileFlag': self.multifileFlag, 'sum(total_chunks)': sum(self.totals_chunks)}]}")
+        if self.UPLOADED < self.total_chunks and self.multifileFlag == 0:
             return "alive"
-        elif len(self.STORAGELIST) > 0:  # Ненужен
-            return "alive"
-        elif self.DOWNLOADED > self.UPLOADED:  # Ненужен
-            return "alive"
+        elif self.multifileFlag == 1:
+            if self.getMultifile is True:
+                if self.UPLOADED <= sum(self.totals_chunks):
+                    return "alive"
+            elif self.getMultifile is False:
+                if self.UPLOADED <= self.totals_chunks[0]:
+                    return "alive"
         else:
             return "dead"
 
@@ -195,12 +200,15 @@ class Tunnel:
                         else:
                             findex, cindex = self.STORAGELIST.pop(0)
                             if not self.getMultifile:
+                                if int(findex) != 0:
+                                    return {"status": "alive-timeout",
+                                            "cnum": -1}
                                 return {"status": "alive",
                                         "cnum": cindex}
                             else:
                                 return {"status": "alive",
                                         "findex": findex,
-                                        "cindex": cindex}
+                                        "cnum": cindex}
                 except Exception:
                     pass
                 time.sleep(0.05)
@@ -211,26 +219,34 @@ class Tunnel:
         """
         Отдаёт чанк информации по номеру чанка и удаляет его из хранилища
         """
-        res = self.STORAGE[int(args["index"]) + 1]
-        del self.STORAGE[int(args["index"]) + 1]
+        if not self.getMultifile:
+            res = self.STORAGE[int(args["index"]) + 1]
+            del self.STORAGE[int(args["index"]) + 1]
+        else:
+            res = self.STORAGE[int(args["findex"])][int(args["index"]) + 1]
+            del self.STORAGE[int(args["findex"])][int(args["index"]) + 1]
         return res
 
-    "P2P Часть"
-    def downloadawait(self):
-        def checkDead(self):
-            if not self.multifileFlag:
-                if self.DOWNLOADED >= self.total_chunks:
+    def checkDead(self):
+        if not self.multifileFlag:
+            print("check: ", self.DOWNLOADED >= self.total_chunks)
+            logging.warning(f"check: {self.DOWNLOADED, self.total_chunks}")
+            if self.DOWNLOADED >= self.total_chunks:
+                return True
+            return False
+        else:
+            if not self.getMultifile:
+                if self.DOWNLOADED >= self.totals_chunks[0]:
                     return True
                 return False
             else:
-                if not self.getMultifile:
-                    if self.DOWNLOADED >= self.totals_chunks[0]:
-                        return True
-                    return False
-                else:
-                    if self.DOWNLOADED >= sum(self.totals_chunks):
-                        return True
-                    return False
+                if self.DOWNLOADED >= sum(self.totals_chunks):
+                    return True
+                return False
+
+    "P2P Часть"
+    def downloadawait(self):
+
         """
         Проверяет количество доступной ОЗУ и возвращает различные статусы:
         alive -> Всё ок
@@ -238,13 +254,13 @@ class Tunnel:
         alive-timeout -> всё ещё живо, но время запроса истекает
         dead -> загрузка завершена
         """
-        if checkDead(self):
+        if self.checkDead():
             return {"status": "dead"}
         start = time.time()
         while (len(self.STORAGELIST) + len(self.RESERVED) + 1) * self.chunksize > self.RAM:
             if time.time() - start > 25:
                 return {"status": "alive-timeout", "data": [(len(self.STORAGELIST) + len(self.RESERVED) + 1) * self.chunksize, self.RAM]}
-            if checkDead(self):
+            if self.checkDead():
                 return {"status": "dead"}
             time.sleep(0.05)
         self.lock2.acquire()
@@ -259,13 +275,13 @@ class Tunnel:
         Сохраняет data в памяти, json хранит информацию о индексе чанка и индексе файла.
         """
         index = json.get("index", -1)
-        if "multifile" not in json or int(json["multifile"]) == 0:
+        if self.multifileFlag == 0:
             self.DOWNLOADED += 1
             self.STORAGE[self.DOWNLOADED if index == -1 else int(index) + 1] = data
             self.STORAGELIST.append(self.DOWNLOADED if index == -1 else int(index) + 1)
             self.RESERVED.pop()
         else:
-            findex = json["fileindex"]
+            findex = json["findex"]
             self.DOWNLOADED += 1
             if findex in self.STORAGE:
                 self.STORAGE[findex][index + 1] = data
@@ -285,8 +301,10 @@ class Tunnel:
             "threads": self.threads,
             "RAM": self.RAM,
             "filename": self.filename,
+            "filenames": self.filenames,
             "totallength": self.total_length,
-            "multifile": self.multifileFlag
+            "totallengths": self.total_lengths,
+            "multifile": 1 if self.multifileFlag else 0
         }
 
 
@@ -442,5 +460,5 @@ def upload():
 
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 8000))
     app.run(host='0.0.0.0', port=port)
