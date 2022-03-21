@@ -19,7 +19,7 @@ Total_RAM = 480 * Mb
 
 @app.route("/")
 def about():
-    return "p2p-tunnel2 v19"
+    return "p2p-tunnel2 v20"
 
 
 class Tunnel:
@@ -369,9 +369,13 @@ def getallrnums():
 
 @app.route("/start/<int:rnum>", methods=['GET', 'POST'])
 def start(rnum):
-    json = dict(request.json)
+    try:
+        json = ast.literal_eval(request.data.decode("UTF-8"))
+    except Exception:
+        json = {}
     args = dict(request.args)
     json.update(args)
+    print(json)
     log = rnums[rnum].init(json)
     return log
 
