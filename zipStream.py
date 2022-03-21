@@ -252,7 +252,6 @@ class ZipStream:
             # pprint(jsonin["files"][str(index)])
             # pprint(jsonin["files"][str(index)]["mktime"])
             dos_time, dos_data = convert_secs_to_dos(int(jsonin["files"][str(index)]["mktime"]))
-            print((dos_time).to_bytes(2, "little"), (dos_data).to_bytes(2, "little"), time.localtime(int(jsonin["files"][str(index)]["mktime"])))
 
             structure[0].mod_time = dos_time
             structure[0].mod_data = dos_data
@@ -262,7 +261,6 @@ class ZipStream:
             structure[0].name_len = int(jsonin["files"][str(index)]["name_len"])
             structure[0].extra_len = 0
             structure[0].index = index
-            print(write_lfh(structure[0], self))
 
             structure[1].made_by_ver = int(jsonin["made_by_ver"])
             structure[1].extract_ver = int(jsonin["extract_ver"])
