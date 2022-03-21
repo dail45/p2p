@@ -7,6 +7,7 @@ import random
 import requests
 import threading
 from flask import Flask, request, render_template
+from zipStream import *
 
 app = Flask(__name__)
 rnums = {}
@@ -18,7 +19,7 @@ Total_RAM = 480 * Mb
 
 @app.route("/")
 def about():
-    return "p2p-tunnel2 v18"
+    return "p2p-tunnel2 v19"
 
 
 class Tunnel:
@@ -98,6 +99,9 @@ class Tunnel:
         else:
             self.totals_chunks = 0
         self.start()
+        if self.multifileFlag == 1:
+            self.zipStream = ZipStream(self)
+            self.zipStream.updateFileHeaders(json)
         return self.log("start")
 
     def log(self, state):
@@ -166,7 +170,7 @@ class Tunnel:
                 if self.UPLOADED <= sum(self.totals_chunks):
                     return "alive"
             elif self.getMultifile is False:
-                if self.UPLOADED <= self.totals_chunks[0]:
+                if self.zipStream.is_alive():
                     return "alive"
         else:
             return "dead"
@@ -182,7 +186,7 @@ class Tunnel:
         dead-timeout: не работает + истекло время ожидания
         """
         status = self.uploadstatus()
-        print(status)
+        print("status:", status)
         if status == "dead":
             return {"status": "dead",
                     "cnum": -1}
@@ -191,37 +195,40 @@ class Tunnel:
                 (self.multifileFlag == 1) and (
                 (self.getMultifile is True and self.UPLOADED <= sum(self.totals_chunks)
                 ) or (
-                self.getMultifile is False and self.UPLOADED <= self.totals_chunks[0]))):
-            if self.DOWNLOADED > self.UPLOADED:
+                self.getMultifile is False and self.zipStream.is_alive()))):
+            if self.DOWNLOADED > self.UPLOADED or (self.multifileFlag == 1 and self.getMultifile is False and
+                                                   self.zipStream.is_alive()):
                 if time.time() - start > 25:
                     return {"status": "alive-timeout",
                             "cnum": -1}
-                try:
-                    if len(self.STORAGELIST) > 0:
-                        self.lock.acquire()
-                        if not self.multifileFlag:
-                            num = self.STORAGELIST.pop(0) - 1
+                if len(self.STORAGELIST) > 0 or (self.multifileFlag == 1 and self.getMultifile is False and
+                                                 self.zipStream.is_alive() and (len(self.zipStream.storage) > 0 or
+                                                 len(self.zipStream.STORAGE) > 0)):
+                    self.lock.acquire()
+                    if self.multifileFlag == 0:
+                        num = self.STORAGELIST.pop(0) - 1
+                        self.UPLOADED += 1
+                        self.lock.release()
+                        return {"status": "alive",
+                                "cnum": num}
+                    else:
+                        if not self.getMultifile:
+                            cindex = self.zipStream.awaitChunk()
+                            print("zipIndex:", cindex)
+                            print(self.zipStream.storage)
+                            if cindex < 0:
+                                self.lock.release()
+                                continue
+                            self.lock.release()
+                            return {"status": "alive",
+                                    "cnum": cindex}
+                        else:
+                            findex, cindex = self.STORAGELIST.pop(0)
                             self.UPLOADED += 1
                             self.lock.release()
                             return {"status": "alive",
-                                    "cnum": num}
-                        else:
-                            findex, cindex = self.STORAGELIST.pop(0)
-                            if not self.getMultifile:
-                                if int(findex) != 0:
-                                    self.lock.release()
-                                    return {"status": "alive-timeout",
-                                            "cnum": -1}
-                                self.lock.release()
-                                return {"status": "alive",
-                                        "cnum": cindex}
-                            else:
-                                self.lock.release()
-                                return {"status": "alive",
-                                        "findex": findex,
-                                        "cnum": cindex}
-                except Exception as f:
-                    print(f)
+                                    "findex": findex,
+                                    "cnum": cindex}
                 time.sleep(0.05)
         return {"status": "dead-timeout",
                 "cnum": -1}
@@ -230,13 +237,15 @@ class Tunnel:
         """
         Отдаёт чанк информации по номеру чанка и удаляет его из хранилища
         """
-        if not self.getMultifile:
+        if self.multifileFlag == 1:
+            if not self.getMultifile:
+                res = self.zipStream.getChunk(int(args["index"]))
+            else:
+                res = self.STORAGE[int(args["findex"])][int(args["index"]) + 1]
+                del self.STORAGE[int(args["findex"])][int(args["index"]) + 1]
+        else:
             res = self.STORAGE[int(args["index"]) + 1]
             del self.STORAGE[int(args["index"]) + 1]
-        else:
-            res = self.STORAGE[int(args["findex"])][int(args["index"]) + 1]
-            del self.STORAGE[int(args["findex"])][int(args["index"]) + 1]
-        self.UPLOADED += 1
         return res
 
     def checkDead(self):
@@ -303,6 +312,9 @@ class Tunnel:
             if "multifile" in args:
                 if int(args["multifile"]) == 1:
                     self.getMultifile = True
+            else:
+                self.filename = self.zipStream.getFileName()
+                self.total_length = self.zipStream.getTotalLength()
         return {
             "chunksize": self.chunksize,
             "threads": self.threads,
@@ -357,10 +369,9 @@ def getallrnums():
 
 @app.route("/start/<int:rnum>", methods=['GET', 'POST'])
 def start(rnum):
-    body = request.data
-    json = request.args
-    if body:
-        json = ast.literal_eval(body.decode("UTF-8"))
+    json = dict(request.json)
+    args = dict(request.args)
+    json.update(args)
     log = rnums[rnum].init(json)
     return log
 
