@@ -19,7 +19,7 @@ Total_RAM = 480 * Mb
 
 @app.route("/")
 def about():
-    return "p2p-tunnel2 v20"
+    return "p2p-tunnel2 v21"
 
 
 class Tunnel:

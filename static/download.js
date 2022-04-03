@@ -35,56 +35,86 @@ function formatSize(size, power=0) {
   return [parseFloat(newSize.toFixed(2)), typeSize, typeSizeInt]
 }
 
-async function register() {
-  regBtn.disabled = true
-  startBtn.disabled = false
-  response = await fetch("/reg")
-  rnum = await response.text()
-  document.getElementById("rnumLabel").innerText = "rnum: " + rnum
-  setTimeout(() => {if (startFlag === false) {regBtn.disabled = false}}, 500)
-  initBtn.disabled = false
-  regFlag = true
-  initFlag = false
-  initFlag = false
-  doneFlag = false
+function renderError(e) {
+  console.log(e)
 }
 
-async function init() {
-  if (fileFlag === false) {
+async function search() {
+  searchBtn.disabled = true
+  try {
+    response = await fetch(`info/${rnum}`)
+  } catch (e) {
+    if (response.statusText === String(500)) {
+      renderError("Internal Server Error")
+      setTimeout(() => {searchBtn.disabled = false}, 500)
+      return
+    }
+    renderError("Connection Error")
+    setTimeout(() => {searchBtn.disabled = false}, 500)
     return
   }
-  regBtn.disabled = true
-  initBtn.disabled = true
-  startBtn.disabled = true
-  let data = {
-    "chunksize": chunkSize,
-    "threads": threads,
-    "RAM": 64 * (2 ** 20),
-    "filename": file.name,
-    "totallength": file.size
+  try {
+    res = await response.json()
+  } catch (e) {
+    renderError("Internal Server Error")
+    setTimeout(() => {searchBtn.disabled = false}, 500)
+    return
   }
-  let sendJson = JSON.stringify(data)
-  response = await fetch(`/start/${rnum}`, {
-    method: "POST",
-    body: sendJson
-  })
-  let log = await response.json()
-  console.log(log)
-  setTimeout(() => {if (startFlag === false) {regBtn.disabled = false;initBtn.disabled = false}}, 500)
+  filename = res["filename"]
+  filenameLabel.innerText = `filename: ${res["filename"]}`
+  totallength = parseInt(res["totallength"])
+  chunkSize = parseInt(res["chunksize"])
+  renderChunksAndSize(0, 0)
+  saveBtn.disabled = false
+  setTimeout(() => {searchBtn.disabled = false}, 500)
+}
+
+var fileStream
+async function save() {
+  var fileHandle = await window.showSaveFilePicker({suggestedName: filename})
+  fileStream = await fileHandle.createWritable()
+  // await fileStream.write(new Blob(["ПОШЁЛ ТЫ НАХЕР КОЗЁЛ!!!"], {type: "text/plain"}))
+  // await fileStream.close()
   startBtn.disabled = false
 }
 
+// async function init() {
+//   if (fileFlag === false) {
+//     return
+//   }
+//   regBtn.disabled = true
+//   initBtn.disabled = true
+//   startBtn.disabled = true
+//   let data = {
+//     "chunksize": chunkSize,
+//     "threads": threads,
+//     "RAM": 64 * (2 ** 20),
+//     "filename": file.name,
+//     "totallength": file.size
+//   }
+//   let sendJson = JSON.stringify(data)
+//   response = await fetch(`/start/${rnum}`, {
+//     method: "POST",
+//     body: sendJson
+//   })
+//   let log = await response.json()
+//   console.log(log)
+//   setTimeout(() => {if (startFlag === false) {regBtn.disabled = false;initBtn.disabled = false}}, 500)
+//   startBtn.disabled = false
+// }
+
 async function start() {
-  startFlag = true
-  regBtn.disabled = true
-  initBtn.disabled = true
+  rnumInput.disabled = true
+  searchBtn.disabled = true
   startBtn.disabled = true
+  startFlag = true
+  writeChunksThread()
   renderSpeed()
-  startThread()
+  startThread(Math.ceil(totallength / chunkSize))
 }
 
-let chunksCounter = 0
-async function startThread() {
+
+async function startThread(totalchunks) {
   while (doneFlag === false) {
     if (threadsOn >= threads) {
       setTimeout(async () => {
@@ -92,65 +122,94 @@ async function startThread() {
       }, 50)
       return
     }
-    /*if (chunkSize * (chunksCounter - 1) >= file.size) {
-      doneFlag = true
-      console.log(`upload done ${uploaded} ${uploadedBytes}`)
-      break
-    }*/
-    if (file.size - chunkSize * chunksCounter <= 0) {
-      doneFlag = true
-      break
-    }
     threadsOn++
-    let chunk = await readChunk(chunkSize * chunksCounter, chunkSize * (chunksCounter + 1))
-    sendChunk(chunk, chunksCounter)
-    chunksCounter++
-  }
-}
-
-async function sendChunk(chunk, index) {
-  if (chunk.size === 0) {
-    return
-  }
-  while (true) {
-    let r = await fetch(`/uploadawait/${rnum}`)
-    let rjs = await r.json()
-    if (rjs["status"] === "dead") {
+    await getChunk()
+    if (downloaded === totalchunks) {
       doneFlag = true
-      threadsOn--
-      break
-    }
-    if (rjs["status"] === "alive-timeout") {
-      continue
-    }
-    if (rjs["status"] === "alive") {
-      await fetch(`/uploadChunk/${rnum}?index=${index}`, {
-        method: "POST",
-        body: chunk
-      })
-      uploaded++
-      uploadedBytes += chunk.byteLength
-      renderProgressBar(Math.ceil((uploadedBytes / file.size) * 100))
-      renderChunksAndSize(uploaded, uploadedBytes)
-      threadsOn--
-      if (uploadedBytes === file.size) {
-        doneFlag = true
-      }
-      break
     }
   }
 }
 
-async function readChunk(start, end) {
-  return new Promise((resolve, reject) => {
-    let sl = file.slice(start, end)
-    let FR = new FileReader()
-    FR.onload = () => {
-      resolve(FR.result)
+async function getChunk() {
+  while (true) {
+    try {
+      response = await fetch(`/awaitChunk/${rnum}`)
+    } catch (e) {
+      if (response.statusText === String(500)) {
+        renderError("Internal Server Error")
+        return
+      }
+      renderError(e)
+      return
     }
-    FR.error = reject
-    FR.readAsArrayBuffer(sl)
-  })
+    try {
+      res = await response.json()
+    } catch (e) {
+      renderError("Internal Server Error")
+      return
+    }
+    if (res["status"] === "dead" || res["status"] === "dead-timeout") {
+      return
+    } else if (res["status"] === "alive-timeout") {
+      continue
+    } else if (res["status"] === "alive") {
+      let cnum = res["cnum"]
+      try {
+        response = await fetch(`/downloadChunk/${rnum}?index=${cnum}`)
+        const reader = response.body.getReader()
+        let chunks = []
+        let lenchunks = 0
+        while (true) {
+          const {done, value} = await reader.read()
+          if (done) {
+            break
+          }
+          // renderSpeed
+          downloadedBytes += value.length
+          lenchunks += value.length
+          chunks.push(value)
+          console.log(1)
+        }
+
+        chunk = new Uint8Array(lenchunks)
+        let pos = 0
+        for (let part of chunks) {
+          chunk.set(part, pos)
+          pos += part.length
+        }
+
+        downloaded += 1
+        STORAGE[cnum] = chunk
+        console.log(`downloaded: ${chunk.length}, in storage: ${STORAGE[cnum].length}, dwBytes: ${downloadedBytes}`)
+        STORAGELIST.push(cnum)
+        return
+      } catch (e) {
+        if (response.statusText === String(500)) {
+          renderError("Internal Server Error")
+          return
+        }
+        renderError(e)
+        return
+      }
+
+    }
+  }
+}
+
+async function writeChunksThread() {
+    if (STORAGELIST.length > 0) {
+      let cnum = STORAGELIST.pop()
+      let chunk = STORAGE[cnum]
+      await fileStream.seek(cnum * chunkSize)
+      await fileStream.write(chunk)
+      console.log(`seek at ${cnum * chunkSize} and write ${chunk.length}`)
+      delete STORAGE[cnum]
+    }
+    if (doneFlag === false || STORAGELIST.length > 0) {
+      setTimeout(writeChunksThread, 50)
+    } else {
+      await fileStream.close()
+    }
 }
 
 function renderProgressBar(value) {
@@ -179,13 +238,13 @@ function renderProgressBar(value) {
 }
 
 function renderChunksAndSize(chunks, size) {
-  chunksLabel.innerText = `${chunks}/${Math.ceil(file.size / chunkSize)}Ch  `
-  var formatedSize = formatSize(file.size)
+  chunksLabel.innerText = `${chunks}/${Math.ceil(totallength / chunkSize)}Ch  `
+  var formatedSize = formatSize(totallength)
   var sizeDone = formatSize(size, power=formatedSize[2])
   sizeLabel.innerText = `${sizeDone[0]}/${formatedSize[0]}${formatedSize[1]}  `
 }
 
-var uploadSpeedArray = Array().concat()
+var downloadSpeedArray = Array().concat()
 var lastSize = 0
 var speed = 0
 var counter = 0
@@ -195,42 +254,51 @@ function renderSpeed(flag=false) {
     return
   }
   counter++
-  uploadSpeedArray.push((uploadedBytes - lastSize) / 0.5)
-  lastSize = uploadedBytes
-  if (uploadSpeedArray.length > 6) {
-    uploadSpeedArray.shift()
+  downloadSpeedArray.push((downloadedBytes - lastSize) / 0.5)
+  lastSize = downloadedBytes
+  if (downloadSpeedArray.length > 6) {
+    downloadSpeedArray.shift()
   }
-  console.log(uploadSpeedArray)
-  speed = uploadSpeedArray.reduce((partialSum, a) => partialSum + a, 0)
-  speed /= uploadSpeedArray.length
+  console.log(downloadSpeedArray)
+  speed = downloadSpeedArray.reduce((partialSum, a) => partialSum + a, 0)
+  speed /= downloadSpeedArray.length
   formatedSpeed = formatSize(speed)
   struct = {
-    "uploadedSpeedArray": uploadSpeedArray,
+    "downloadedSpeedArray": downloadSpeedArray,
     "lastSize": lastSize,
-    "uploadedBytes": uploadedBytes,
+    "downloadedBytes": downloadedBytes,
     "speed": speed,
     "formatedSpeed": formatedSpeed
   }
   console.log(struct)
   speedLabel.innerText = `${formatedSpeed[0]} ${formatedSpeed[1]}/s`
+  renderChunksAndSize(downloaded, downloadedBytes)
+  renderProgressBar(Math.ceil((downloadedBytes / totallength) * 100))
   if (doneFlag === false) {
     setTimeout(renderSpeed, 500, false)
   }
 }
 
 
+var filename
 var fileFlag = false
-var regFlag = false
-var initFlag = false
-var startFlag = false
+// var regFlag = false
+// var initFlag = false
+// var startFlag = false
 var doneFlag = false
 var rnum = 0
 var file = null
+var state = 0
 var chunkSize = 4 * (2 ** 20)
 var threads = 16
 var threadsOn = 0
+var totallength = 0
 var downloaded = 0
 var downloadedBytes = 0
+
+var STORAGE = {}
+var STORAGELIST = []
+
 var filenameInput = document.getElementById("filenameInput")
 var searchBtn = document.getElementById("searchBtn")
 var saveBtn = document.getElementById("saveBtn")
@@ -240,19 +308,31 @@ var chunksLabel = document.getElementById("ChunksLabel")
 var sizeLabel = document.getElementById("SizeLabel")
 var speedLabel = document.getElementById("SpeedLabel")
 var startBtn = document.getElementById("startBtn")
+var filenameLabel = document.getElementById("filenameLabel")
+var rnumInput = document.getElementById("rnumInput")
 
 document.addEventListener("readystatechange", () => {
   if (document.readyState === "complete") {
     renderProgressBar(0)
-     filenameInput = document.getElementById("filenameInput")
-     searchBtn = document.getElementById("searchBtn")
-     saveBtn = document.getElementById("saveBtn")
-     progressBar = document.getElementById("progressBar")
-     progressBarValue = document.getElementById("progressBarValue")
-     chunksLabel = document.getElementById("ChunksLabel")
-     sizeLabel = document.getElementById("SizeLabel")
-     speedLabel = document.getElementById("SpeedLabel")
-     startBtn = document.getElementById("startBtn")
+    filenameInput = document.getElementById("filenameInput")
+    searchBtn = document.getElementById("searchBtn")
+    saveBtn = document.getElementById("saveBtn")
+    progressBar = document.getElementById("progressBar")
+    progressBarValue = document.getElementById("progressBarValue")
+    chunksLabel = document.getElementById("ChunksLabel")
+    sizeLabel = document.getElementById("SizeLabel")
+    speedLabel = document.getElementById("SpeedLabel")
+    startBtn = document.getElementById("startBtn")
+    filenameLabel = document.getElementById("filenameLabel")
+    rnumInput = document.getElementById("rnumInput")
+
+    saveBtn.disabled = true
+    startBtn.disabled = true
+
+    searchBtn.addEventListener("click", () => {search()})
+    rnumInput.addEventListener("change", () => {rnum = parseInt(rnumInput.value)})
+    saveBtn.addEventListener("click", () => {save()})
+    startBtn.addEventListener("click", () => {start()})
 
 
 
@@ -262,6 +342,6 @@ document.addEventListener("readystatechange", () => {
     chunkSizeTypeInput.addEventListener("change", () => {changeChunkSize(chunkSizeInput, chunkSizeTypeInput)})
     threadsInput.addEventListener("change", () => {threads = threadsInput.value})
     initBtn.addEventListener("click", () => {init()})
-    startBtn.addEventListener("click", () => {start()})*/
+    */
   }
 })

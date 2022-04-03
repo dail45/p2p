@@ -14,19 +14,12 @@
     }</style>
 </head>
 <body>
-    <span>filename: </span><input type="text" id="filenameInput"><br>
+    <span id="filenameLabel">filename: </span><br>
     <span id="rnumLabel">rnum: </span><input type="number" id="rnumInput"><br>
     <input type="button" id="searchBtn" value="Search"><br>
-    <input type="button" value="save" id="saveBtn" onclick="saveto()"><br>
+    <input type="button" value="save" id="saveBtn"><br>
     <canvas style="width: 50%; height: 20px; background-color: black" id="progressBar" height="20px" width="102px"></canvas><span id="progressBarValue"> 0%</span><br>
-    <span id="ChunksLabel">0/0Ch&nbsp;&nbsp;&nbsp;</span><span id="SizeLabel">0/0KB&nbsp;&nbsp;&nbsp;</span><span id="SpeedLabel">0KB/s</span><br>
+    <span id="ChunksLabel">0/0Ch</span>&nbsp;&nbsp;&nbsp;<span id="SizeLabel">0/0KB</span>&nbsp;&nbsp;&nbsp;<span id="SpeedLabel">0KB/s</span><br>
     <input type="button" id="startBtn" value="start">
 </body>
 </html>
-<script>
-    function saveto() {
-        window.navigator.msSaveOrOpenBlob(
-            "file text",
-            "1.txt")
-    }
-</script>
