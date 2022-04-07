@@ -19,7 +19,7 @@ Total_RAM = 480 * Mb
 
 @app.route("/")
 def about():
-    return "p2p-tunnel2 v22"
+    return "p2p-tunnel2 v23"
 
 
 class Tunnel:
@@ -102,6 +102,7 @@ class Tunnel:
         else:
             self.totals_chunks = 0
         self.start()
+        self.zipStream = None
         if self.multifileFlag == 1:
             self.zipStream = ZipStream(self)
             self.zipStream.updateFileHeaders(json)
@@ -124,6 +125,17 @@ class Tunnel:
 
     def isUploaded(self):
         return self.checkDead()
+
+    def isDownloadable(self):
+        # ToDo Проверка на загрузку
+        return True if (self.zipStream and self.zipStream.getTotalLength() <= self.RAM) or (self.multifileFlag == 0 and self.total_length <= self.RAM) else False
+
+    def directDownload(self):
+        if self.zipStream:
+            data = b"".join([self.zipStream.getChunk(i) for i in range(len(self.zipStream.storage))])
+        else:
+            data = b"".join([self.STORAGE[i + 1] for i in range(len(self.STORAGE))])
+        return data
 
     def start(self):
         """
@@ -429,7 +441,12 @@ def direct_download(rnum):
     tunnel = rnums[rnum]
     if tunnel.downloadtoken == "00000000":
         if tunnel.isUploaded():
-            return ""
+            if tunnel.isDownloadable():
+                data = tunnel.directDownload()
+                kill(rnum)
+                return data
+            else:
+                return "Access denied: file is too big"
         else:
             return "Access denied: file is not full"
     else:
