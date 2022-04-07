@@ -19,13 +19,16 @@ Total_RAM = 480 * Mb
 
 @app.route("/")
 def about():
-    return "p2p-tunnel2 v21"
+    return "p2p-tunnel2 v22"
 
 
 class Tunnel:
     def __init__(self):
         """DOWNLOADED: from S or P >>> STORAGE"""
         """UPLOADED: from STORAGE >>> P"""
+        self.uploadtoken = "00000000"
+        self.downloadtoken = "00000000"
+
         self.total_length = 0
         self.total_chunks = 0
         self.STORAGE = {}
@@ -118,6 +121,9 @@ class Tunnel:
                     "filenames": self.filenames,
                     "totallengths": self.total_lengths,
                     "totalschunks": self.totals_chunks}
+
+    def isUploaded(self):
+        return self.checkDead()
 
     def start(self):
         """
@@ -250,8 +256,8 @@ class Tunnel:
 
     def checkDead(self):
         if not self.multifileFlag:
-            print("check: ", self.DOWNLOADED >= self.total_chunks)
-            logging.warning(f"check: {self.DOWNLOADED, self.total_chunks}")
+            # print("check: ", self.DOWNLOADED >= self.total_chunks)
+            # logging.warning(f"check: {self.DOWNLOADED, self.total_chunks}")
             if self.DOWNLOADED >= self.total_chunks:
                 return True
             return False
@@ -337,6 +343,13 @@ def memoryCheck(RAM):
         return (Total_RAM - sum_RAM) - RAM
 
 
+def checkToken(rnum, type="Up", token="00000000"):
+    if type == "Up":
+        return token == rnums[rnum].uploadtoken
+    elif type == "Down":
+        return token == rnums[rnum].downloadtoken
+
+
 ##################################################################
 #####                   RNUM REGISTR                        ######
 ##################################################################
@@ -353,20 +366,6 @@ def registration():
     return str(rnum)
 
 
-@app.route("/kill/<int:rnum>")
-def kill(rnum):
-    del rnums[rnum]
-    return {"status": "ok"}
-
-
-@app.route("/gtrns")
-def getallrnums():
-    if rnums:
-        return {"rnums": [k for k, v in rnums.items()]}
-    else:
-        return {"rnums": None}
-
-
 @app.route("/start/<int:rnum>", methods=['GET', 'POST'])
 def start(rnum):
     try:
@@ -375,36 +374,73 @@ def start(rnum):
         json = {}
     args = dict(request.args)
     json.update(args)
-    print(json)
-    log = rnums[rnum].init(json)
+    token = "00000000" if "token" not in json else json["token"]
+    if checkToken(rnum, "Up", token):
+        log = rnums[rnum].init(json)
+    else:
+        log = "Access denied"
     return log
 
 
 @app.route("/awaitChunk/<int:rnum>")
 def await_chunk(rnum):
-    return rnums[rnum].uploadawait()
+    json = request.args
+    token = "00000000" if "token" not in json else json["token"]
+    if checkToken(rnum, "Down", token):
+        return rnums[rnum].uploadawait()
+    else:
+        return "Access denied"
 
 
 @app.route("/downloadChunk/<int:rnum>")
 def download_chunk(rnum):
     args = request.args
-    return rnums[rnum].upload(args)
+    token = "00000000" if "token" not in args else args["token"]
+    if checkToken(rnum, "Down", token):
+        return rnums[rnum].upload(args)
+    else:
+        return "Access denied"
+
 
 
 @app.route("/uploadawait/<int:rnum>")
 def upload_await(rnum):
-    a = rnums[rnum].downloadawait()
-    logging.warning(a)
-    return a
+    json = request.args
+    token = "00000000" if "token" not in json else json["token"]
+    if checkToken(rnum, "Up", token):
+        return rnums[rnum].downloadawait()
+    else:
+        return "Access denied"
 
 
 @app.route("/uploadChunk/<int:rnum>", methods=['GET', 'POST'])
 def upload_chunk(rnum):
-    data = request.data
     json = request.args
-    rnums[rnum].downloadchunk(data, json)
-    return {"status": "ok"}
+    token = "00000000" if "token" not in json else json["token"]
+    if checkToken(rnum, "Up", token):
+        data = request.data
+        return rnums[rnum].downloadchunk(data, json)
+    else:
+        return "Access denied"
 
+
+@app.route("/directlink/<int:rnum>")
+def direct_download(rnum):
+    tunnel = rnums[rnum]
+    if tunnel.downloadtoken == "00000000":
+        if tunnel.isUploaded():
+            return ""
+        else:
+            return "Access denied: file is not full"
+    else:
+        return "Access denied"
+
+
+
+
+##################################################################
+#####                       Service                         ######
+##################################################################
 
 @app.route("/info/<int:rnum>")
 def info(rnum):
@@ -427,10 +463,22 @@ def clear():
         del k[v]
 
 
+@app.route("/gtrns")
+def getallrnums():
+    if rnums:
+        return {"rnums": [k for k, v in rnums.items()]}
+    else:
+        return {"rnums": None}
+
+
+@app.route("/kill/<int:rnum>")
+def kill(rnum):
+    del rnums[rnum]
+    return {"status": "ok"}
+
 ##################################################################
 #####                   DNUM REGISTR                        ######
 ##################################################################
-
 
 @app.route("/dreg")
 def dregistration():
@@ -464,6 +512,34 @@ def awaitRnum(dnum):
                     "data": data}
         time.sleep(0.05)
 
+##################################################################
+#####                     Token verivy                      ######
+##################################################################
+@app.route("/gettoken")
+def tokenregistration():
+    nums = list(map(str, range(10)))
+    token = int("".join(random.sample(nums, 8)))
+    while str(token)[0] == "0":
+        token = int("".join(random.sample(nums, 8)))
+    return str(token)
+
+
+@app.route("/setuploadtoken")
+def setUploadToken():
+    rnum, token = request.args["rnum"], request.args["token"]
+    if rnums[rnum].uploadtoken != "00000000":
+        return "Access denied"
+    rnums[rnum].uploadtoken = token
+    return "Ok"
+
+
+@app.route("/setdownloadtoken")
+def setDownloadToken():
+    rnum, token = request.args["rnum"], request.args["token"]
+    if rnums[rnum].downloadtoken != "00000000":
+        return "Access denied"
+    rnums[rnum].downloadtoken = token
+    return "Ok"
 
 ##################################################################
 #####                        VISUAL                         ######
