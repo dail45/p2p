@@ -6,7 +6,7 @@ import math
 import random
 import requests
 import threading
-from flask import Flask, request, render_template
+from flask import Flask, request, render_template, Response, redirect
 from zipStream import *
 
 app = Flask(__name__)
@@ -19,7 +19,7 @@ Total_RAM = 480 * Mb
 
 @app.route("/")
 def about():
-    return "p2p-tunnel2 v23"
+    return "p2p-tunnel2 v24"
 
 
 class Tunnel:
@@ -127,14 +127,23 @@ class Tunnel:
         return self.checkDead()
 
     def isDownloadable(self):
-        # ToDo Проверка на загрузку
-        return True if (self.zipStream and self.zipStream.getTotalLength() <= self.RAM) or (self.multifileFlag == 0 and self.total_length <= self.RAM) else False
+        if self.zipStream:
+            self.filename = "untitled.zip"
+        if self.UPLOADED > 0:
+            return False
+        return True if (self.zipStream and self.zipStream.getTotalLength() <= self.RAM) or (
+                self.multifileFlag == 0 and self.total_length <= self.RAM) else False
 
     def directDownload(self):
         if self.zipStream:
             data = b"".join([self.zipStream.getChunk(i) for i in range(len(self.zipStream.storage))])
         else:
             data = b"".join([self.STORAGE[i + 1] for i in range(len(self.STORAGE))])
+        # totallength = self.zipStream.getTotalLength() if self.zipStream else self.total_length
+        # if totallength == len(data):
+        #     return data
+        # else:
+        #     return False
         return data
 
     def start(self):
@@ -442,9 +451,7 @@ def direct_download(rnum):
     if tunnel.downloadtoken == "00000000":
         if tunnel.isUploaded():
             if tunnel.isDownloadable():
-                data = tunnel.directDownload()
-                kill(rnum)
-                return data
+                return redirect(f"/directlink/{rnum}/{tunnel.filename}")
             else:
                 return "Access denied: file is too big"
         else:
@@ -453,7 +460,15 @@ def direct_download(rnum):
         return "Access denied"
 
 
-
+@app.route("/directlink/<int:rnum>/<string:filename>")
+def direct_download2(rnum, filename):
+    tunnel = rnums[rnum]
+    data = tunnel.directDownload()
+    res = Response(data)
+    res.headers["Content-Disposition"] = f"attachment; %20filename={filename}"
+    res.headers["Content-Length"] = str(len(data))
+    kill(rnum)
+    return res
 
 ##################################################################
 #####                       Service                         ######
