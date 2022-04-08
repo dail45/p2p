@@ -19,7 +19,7 @@ Total_RAM = 480 * Mb
 
 @app.route("/")
 def about():
-    return "p2p-tunnel2 v24"
+    return "p2p-tunnel2 v24.1"
 
 
 class Tunnel:
@@ -467,6 +467,7 @@ def direct_download2(rnum, filename):
     res = Response(data)
     res.headers["Content-Disposition"] = f"attachment; %20filename={filename}"
     res.headers["Content-Length"] = str(len(data))
+    res.headers["Content-Type"] = "multipart/form-data"
     kill(rnum)
     return res
 
