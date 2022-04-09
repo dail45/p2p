@@ -19,7 +19,7 @@ Total_RAM = 480 * Mb
 
 @app.route("/")
 def about():
-    return "p2p-tunnel2 v24.1"
+    return "p2p-tunnel2 v24.2"
 
 
 class Tunnel:
@@ -399,7 +399,7 @@ def start(rnum):
     if checkToken(rnum, "Up", token):
         log = rnums[rnum].init(json)
     else:
-        log = "Access denied"
+        log = {"status": "Access denied"}
     return log
 
 
@@ -410,7 +410,7 @@ def await_chunk(rnum):
     if checkToken(rnum, "Down", token):
         return rnums[rnum].uploadawait()
     else:
-        return "Access denied"
+        return {"status": "Access denied"}
 
 
 @app.route("/downloadChunk/<int:rnum>")
@@ -420,7 +420,7 @@ def download_chunk(rnum):
     if checkToken(rnum, "Down", token):
         return rnums[rnum].upload(args)
     else:
-        return "Access denied"
+        return {"status": "Access denied"}
 
 
 
@@ -431,7 +431,7 @@ def upload_await(rnum):
     if checkToken(rnum, "Up", token):
         return rnums[rnum].downloadawait()
     else:
-        return "Access denied"
+        return {"status": "Access denied"}
 
 
 @app.route("/uploadChunk/<int:rnum>", methods=['GET', 'POST'])
@@ -442,7 +442,7 @@ def upload_chunk(rnum):
         data = request.data
         return rnums[rnum].downloadchunk(data, json)
     else:
-        return "Access denied"
+        return {"status": "Access denied"}
 
 
 @app.route("/directlink/<int:rnum>")
@@ -457,7 +457,7 @@ def direct_download(rnum):
         else:
             return "Access denied: file is not full"
     else:
-        return "Access denied"
+        return {"status": "Access denied"}
 
 
 @app.route("/directlink/<int:rnum>/<string:filename>")
@@ -559,18 +559,18 @@ def tokenregistration():
 
 @app.route("/setuploadtoken")
 def setUploadToken():
-    rnum, token = request.args["rnum"], request.args["token"]
+    rnum, token = int(request.args["rnum"]), request.args["token"]
     if rnums[rnum].uploadtoken != "00000000":
-        return "Access denied"
+        return {"status": "Access denied"}
     rnums[rnum].uploadtoken = token
     return "Ok"
 
 
 @app.route("/setdownloadtoken")
 def setDownloadToken():
-    rnum, token = request.args["rnum"], request.args["token"]
+    rnum, token = int(request.args["rnum"]), request.args["token"]
     if rnums[rnum].downloadtoken != "00000000":
-        return "Access denied"
+        return {"status": "Access denied"}
     rnums[rnum].downloadtoken = token
     return "Ok"
 
