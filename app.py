@@ -563,7 +563,7 @@ def setUploadToken():
     if rnums[rnum].uploadtoken != "00000000":
         return {"status": "Access denied"}
     rnums[rnum].uploadtoken = token
-    return "Ok"
+    return {"status": "Ok"}
 
 
 @app.route("/setdownloadtoken")
@@ -572,7 +572,7 @@ def setDownloadToken():
     if rnums[rnum].downloadtoken != "00000000":
         return {"status": "Access denied"}
     rnums[rnum].downloadtoken = token
-    return "Ok"
+    return {"status": "Ok"}
 
 ##################################################################
 #####                        VISUAL                         ######
