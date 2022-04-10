@@ -29,7 +29,7 @@ Total_RAM = 480 * Mb
 
 @app.get("/")
 def about():
-    return "p2p-tunnel3 v1"
+    return "p2p-tunnel3 v1.1"
 
 
 class Tunnel:
