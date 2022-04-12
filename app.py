@@ -28,7 +28,7 @@ Mb = 2 ** 20
 Total_RAM = 480 * Mb
 
 REVISION = "3"
-VERSION = "4"
+VERSION = "4.1"
 
 
 @app.get("/")
@@ -282,10 +282,11 @@ class Tunnel:
 
     def getHash(self, findex, index):
         if self.SecureDownloading:
-            if self.getMultifile is True or self.multifileFlag is False:
-                return self.Hashes[(findex, index)]
+            print("DEBUG:", self.getMultifile, self.multifileFlag)
+            if self.getMultifile is True or not self.multifileFlag:
+                return f"{self.Hashes[(findex, index)]}"
             else:
-                return self.zipStream.getHash(index)
+                return f"{self.zipStream.getHash(index)}"
         return None
 
     def removechunk(self, findex, index, forced=False):
