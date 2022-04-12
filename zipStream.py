@@ -1,5 +1,6 @@
 import ctypes
 import datetime
+import hashlib
 import math
 import time
 from copy import deepcopy
@@ -149,6 +150,7 @@ class ZipStream:
         self.parent = parent
         self.STORAGE = b""
         self.storage = {}
+        self.Hashes = {}
         self.localstorage = b""  # delete this
         self.last = []
         self.filesEnd = False
@@ -231,6 +233,7 @@ class ZipStream:
             self.counter += 1
             self.storage[self.counter] = self.STORAGE[:self.parent.chunksize]
             self.STORAGE = self.STORAGE[self.parent.chunksize:]
+            self.Hashes[self.counter] = hashlib.sha1(self.storage[self.counter]).hexdigest()
             return self.counter
         return -1
 
@@ -239,6 +242,9 @@ class ZipStream:
 
     def getChunk(self, counter):
         return self.storage[counter]
+
+    def getHash(self, index):
+        return self.Hashes[index]
 
     def is_alive(self):
         return len(self.STORAGE) > 0 or not self.filesEnd

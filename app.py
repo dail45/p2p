@@ -1,4 +1,5 @@
 import ast
+import hashlib
 import logging
 import os
 import time
@@ -27,7 +28,8 @@ Mb = 2 ** 20
 Total_RAM = 480 * Mb
 
 REVISION = "3"
-VERSION = "3.2"
+VERSION = "4"
+
 
 @app.get("/")
 def about():
@@ -45,6 +47,7 @@ class Tunnel:
         self.total_chunks = 0
         self.STORAGE = {}
         self.STORAGELIST = []
+        self.Hashes = {}
         self.RESERVED = []
         self.DOWNLOADED = 0
         self.UPLOADED = 0
@@ -61,6 +64,7 @@ class Tunnel:
         self.r = None
         self.getMultifile = False
         self.SecureRemoveChunks = False
+        self.SecureDownloading = False
         self.lock = threading.Lock()
         self.lock2 = threading.Lock()
         self.headers = {
@@ -250,28 +254,39 @@ class Tunnel:
                         self.UPLOADED += 1
                         self.lock.release()
                         return {"status": "alive",
-                                "cnum": num}
+                                "cnum": num,
+                                "Hash": self.getHash(-1, num)}
                     else:
                         if not self.getMultifile:
                             cindex = self.zipStream.awaitChunk()
-                            print("zipIndex:", cindex)
-                            print(self.zipStream.storage)
+                            # print("zipIndex:", cindex)
+                            # print(self.zipStream.storage)
                             if cindex < 0:
                                 self.lock.release()
                                 continue
                             self.lock.release()
                             return {"status": "alive",
-                                    "cnum": cindex}
+                                    "cnum": cindex,
+                                    "Hash": self.getHash(-1, cindex)}
                         else:
                             findex, cindex = self.STORAGELIST.pop(0)
                             self.UPLOADED += 1
                             self.lock.release()
                             return {"status": "alive",
                                     "findex": findex,
-                                    "cnum": cindex}
+                                    "cnum": cindex,
+                                    "Hash": self.getHash(findex, cindex)}
                 time.sleep(0.005)
         return {"status": "dead-timeout",
                 "cnum": -1}
+
+    def getHash(self, findex, index):
+        if self.SecureDownloading:
+            if self.getMultifile is True or self.multifileFlag is False:
+                return self.Hashes[(findex, index)]
+            else:
+                return self.zipStream.getHash(index)
+        return None
 
     def removechunk(self, findex, index, forced=False):
         print(f"Удаление... {self.SecureRemoveChunks} | {forced}")
@@ -344,6 +359,7 @@ class Tunnel:
         """
         index = int(json.get("index", -1))
         if self.multifileFlag == 0:
+            findex = -1
             self.DOWNLOADED += 1
             self.STORAGE[self.DOWNLOADED if index == -1 else int(index) + 1] = data
             self.STORAGELIST.append(self.DOWNLOADED if index == -1 else int(index) + 1)
@@ -357,6 +373,7 @@ class Tunnel:
                 self.STORAGE[findex] = {index + 1: data}
             self.STORAGELIST.append((findex, index))
             self.RESERVED.pop()
+        self.Hashes[(findex, index)] = hashlib.sha1(data).hexdigest()
         return {"status": "ok"}
 
     def getInfo(self, args):
@@ -369,6 +386,8 @@ class Tunnel:
                 self.total_length = self.zipStream.getTotalLength()
         if "SecureRemoveChunks" in args:
             self.SecureRemoveChunks = True if int(args["SecureRemoveChunks"]) == 1 else False
+        if "SecureDownloading" in args:
+            self.SecureDownloading = True if int(args["SecureDownloading"]) == 1 else False
         return {
             "chunksize": self.chunksize,
             "threads": self.threads,
@@ -551,6 +570,7 @@ def getallrnums():
 
 @app.get("/kill/{rnum}")
 def kill(rnum: int):
+    print(rnums[rnum].Hashes)
     del rnums[rnum]
     return {"status": "ok"}
 
