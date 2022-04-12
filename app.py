@@ -27,7 +27,7 @@ Mb = 2 ** 20
 Total_RAM = 480 * Mb
 
 REVISION = "3"
-VERSION = "3"
+VERSION = "3.1"
 
 @app.get("/")
 def about():
@@ -461,8 +461,8 @@ def remove_chunk(rnum: int, req: Request):
     args = dict(req.query_params)
     token = "00000000" if "token" not in args else args["token"]
     if checkToken(rnum, "Down", token):
-        findex = args.get("findex", -1)
-        index = args["index"]
+        findex = int(args.get("findex", -1))
+        index = int(args["index"])
         rnums[rnum].removechunk(findex, index, True)
         return {"status": "Ok"}
     else:
