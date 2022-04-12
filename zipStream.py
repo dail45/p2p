@@ -234,8 +234,11 @@ class ZipStream:
             return self.counter
         return -1
 
+    def removeChunk(self, index):
+        self.storage.pop(index)
+
     def getChunk(self, counter):
-        return self.storage.pop(counter)
+        return self.storage[counter]
 
     def is_alive(self):
         return len(self.STORAGE) > 0 or not self.filesEnd

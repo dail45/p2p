@@ -26,10 +26,12 @@ Kb = 2 ** 10
 Mb = 2 ** 20
 Total_RAM = 480 * Mb
 
+REVISION = "3"
+VERSION = "2"
 
 @app.get("/")
 def about():
-    return "p2p-tunnel3 v1.1"
+    return f"p2p-tunnel{REVISION} v{VERSION}"
 
 
 class Tunnel:
@@ -58,6 +60,7 @@ class Tunnel:
         self.S2PThread = None
         self.r = None
         self.getMultifile = False
+        self.SecureRemoveChunks = False
         self.lock = threading.Lock()
         self.lock2 = threading.Lock()
         self.headers = {
@@ -266,9 +269,19 @@ class Tunnel:
                             return {"status": "alive",
                                     "findex": findex,
                                     "cnum": cindex}
-                time.sleep(0.05)
+                time.sleep(0.005)
         return {"status": "dead-timeout",
                 "cnum": -1}
+
+    def removechunk(self, findex, index, forced=False):
+        if self.SecureRemoveChunks is False or forced is True:
+            if self.multifileFlag == 1:
+                if not self.getMultifile:
+                    self.zipStream.removeChunk(index)
+                else:
+                    del self.STORAGE[findex][index + 1]
+            else:
+                del self.STORAGE[index + 1]
 
     def upload(self, args) -> bytes:
         """
@@ -277,12 +290,13 @@ class Tunnel:
         if self.multifileFlag == 1:
             if not self.getMultifile:
                 res = self.zipStream.getChunk(int(args["index"]))
+                self.removechunk(-2, int(args["index"]))
             else:
                 res = self.STORAGE[int(args["findex"])][int(args["index"]) + 1]
-                del self.STORAGE[int(args["findex"])][int(args["index"]) + 1]
+                self.removechunk(int(args["findex"]), int(args["index"]))
         else:
             res = self.STORAGE[int(args["index"]) + 1]
-            del self.STORAGE[int(args["index"]) + 1]
+            self.removechunk(-1, int(args["index"]))
         return res
 
     def checkDead(self):
@@ -315,7 +329,7 @@ class Tunnel:
                 return {"status": "alive-timeout", "data": [(len(self.STORAGELIST) + len(self.RESERVED) + 1) * self.chunksize, self.RAM]}
             if self.checkDead():
                 return {"status": "dead"}
-            time.sleep(0.05)
+            time.sleep(0.005)
         self.lock2.acquire()
         if (len(self.STORAGELIST) + len(self.RESERVED) + 1) * self.chunksize > self.RAM:
             return {"status": "ram-error"}
@@ -352,6 +366,8 @@ class Tunnel:
             else:
                 self.filename = self.zipStream.getFileName()
                 self.total_length = self.zipStream.getTotalLength()
+            if "SecureRemoveChunks" in args:
+                self.SecureRemoveChunks = True if int(args["SecureRemoveChunks"]) == 1 else False
         return {
             "chunksize": self.chunksize,
             "threads": self.threads,
@@ -436,6 +452,19 @@ def download_chunk(rnum: int, req: Request):
     token = "00000000" if "token" not in args else args["token"]
     if checkToken(rnum, "Down", token):
         return Response(content=rnums[rnum].upload(args))
+    else:
+        return {"status": "Access denied"}
+
+
+@app.get("/removeChunk/{rnum}")
+def remove_chunk(rnum: int, req: Request):
+    args = dict(req.query_params)
+    token = "00000000" if "token" not in args else args["token"]
+    if checkToken(rnum, "Down", token):
+        findex = args.get("findex", -1)
+        index = args["index"]
+        rnums[rnum].removechunk(findex, index, True)
+        return {"status": "Ok"}
     else:
         return {"status": "Access denied"}
 
