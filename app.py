@@ -27,7 +27,7 @@ Mb = 2 ** 20
 Total_RAM = 480 * Mb
 
 REVISION = "3"
-VERSION = "2.2"
+VERSION = "3"
 
 @app.get("/")
 def about():
