@@ -27,7 +27,7 @@ Mb = 2 ** 20
 Total_RAM = 480 * Mb
 
 REVISION = "3"
-VERSION = "3.1"
+VERSION = "3.2"
 
 @app.get("/")
 def about():
@@ -274,6 +274,7 @@ class Tunnel:
                 "cnum": -1}
 
     def removechunk(self, findex, index, forced=False):
+        print(f"Удаление... {self.SecureRemoveChunks} | {forced}")
         if self.SecureRemoveChunks is False or forced is True:
             if self.multifileFlag == 1:
                 if not self.getMultifile:
@@ -366,8 +367,8 @@ class Tunnel:
             else:
                 self.filename = self.zipStream.getFileName()
                 self.total_length = self.zipStream.getTotalLength()
-            if "SecureRemoveChunks" in args:
-                self.SecureRemoveChunks = True if int(args["SecureRemoveChunks"]) == 1 else False
+        if "SecureRemoveChunks" in args:
+            self.SecureRemoveChunks = True if int(args["SecureRemoveChunks"]) == 1 else False
         return {
             "chunksize": self.chunksize,
             "threads": self.threads,
