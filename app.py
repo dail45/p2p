@@ -27,7 +27,7 @@ Mb = 2 ** 20
 Total_RAM = 480 * Mb
 
 REVISION = "3"
-VERSION = "2"
+VERSION = "2.2"
 
 @app.get("/")
 def about():
@@ -649,4 +649,4 @@ def test(req: Request):
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host='0.0.0.0', port=port)
+    uvicorn.run(app, host='0.0.0.0', port=port, reload=False)
