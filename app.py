@@ -21,7 +21,7 @@ Total_RAM = 480 * Mb
 
 
 REVISION = "2"
-VERSION = "25"
+VERSION = "25.1"
 
 
 @app.route("/")
