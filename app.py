@@ -8,30 +8,23 @@ import random
 from pathlib import Path
 import requests
 import threading
-# from flask import Flask, request, render_template, Response, redirect
-from fastapi import FastAPI, Response, Request, responses
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-import uvicorn
+from flask import Flask, request, render_template, Response, redirect
 from zipStream import *
 
-app = FastAPI()
 
-BASE_DIR = Path(__file__).resolve().parent
-templates = Jinja2Templates(directory=str(Path(BASE_DIR, 'templates')))
-app.mount("/static", StaticFiles(directory=str(Path(BASE_DIR, 'static'))), name="static")
-
+app = Flask(__name__)
 rnums = {}
 dnums = {}
 Kb = 2 ** 10
 Mb = 2 ** 20
 Total_RAM = 480 * Mb
 
-REVISION = "3"
-VERSION = "4.1"
+
+REVISION = "2"
+VERSION = "25"
 
 
-@app.get("/")
+@app.route("/")
 def about():
     return f"p2p-tunnel{REVISION} v{VERSION}"
 
@@ -411,10 +404,12 @@ def memoryCheck(RAM):
         return (Total_RAM - sum_RAM) - RAM
 
 
-def checkToken(rnum, type="Up", token="00000000"):
-    if type == "Up":
+def checkToken(rnum, typeCheck="Up", token="00000000"):
+    logging.warning(f"=====: {[(i, type(i)) for i in rnums.keys()]}")
+    logging.warning((rnum, type(rnum)))
+    if typeCheck == "Up":
         return token == rnums[rnum].uploadtoken
-    elif type == "Down":
+    elif typeCheck == "Down":
         return token == rnums[rnum].downloadtoken
 
 
@@ -423,7 +418,7 @@ def checkToken(rnum, type="Up", token="00000000"):
 ##################################################################
 
 
-@app.get("/reg")
+@app.route("/reg")
 def registration():
     nums = list(map(str, range(10)))
     rnum = int("".join(random.sample(nums, 4)))
@@ -431,12 +426,20 @@ def registration():
         rnum = int("".join(random.sample(nums, 4)))
     rnums[rnum] = Tunnel()
     rnums[rnum].setrnum(rnum)
-    return rnum
+    logging.warning(f"=====: {rnums.keys()}")
+    time.sleep(0.05)
+    return str(rnum)
 
 
-@app.get("/start/{rnum}")
-def start(rnum: int, req: Request):
-    args = dict(req.query_params)
+
+@app.route("/start/<int:rnum>", methods=['GET', 'POST'])
+def start(rnum):
+    try:
+        json = ast.literal_eval(request.data.decode("UTF-8"))
+    except Exception:
+        json = {}
+    args = dict(request.args)
+    args.update(json)
     token = "00000000" if "token" not in args else args["token"]
     if checkToken(rnum, "Up", token):
         log = rnums[rnum].init(args)
@@ -445,41 +448,29 @@ def start(rnum: int, req: Request):
     return log
 
 
-@app.post("/start/{rnum}")
-async def start_post(rnum: int, req: Request):
-    body = await req.body()
-    args = ast.literal_eval(body.decode("UTF-8"))
-    token = "00000000" if "token" not in args else args["token"]
-    if checkToken(rnum, "Up", token):
-        log = rnums[rnum].init(args)
-    else:
-        log = {"status": "Access denied"}
-    return log
-
-
-@app.get("/awaitChunk/{rnum}")
-def await_chunk(rnum: int, req: Request):
-    args = dict(req.query_params)
-    token = "00000000" if "token" not in args else args["token"]
+@app.route("/awaitChunk/<int:rnum>")
+def await_chunk(rnum):
+    json = request.args
+    token = "00000000" if "token" not in json else json["token"]
     if checkToken(rnum, "Down", token):
         return rnums[rnum].uploadawait()
     else:
         return {"status": "Access denied"}
 
 
-@app.get("/downloadChunk/{rnum}")
-def download_chunk(rnum: int, req: Request):
-    args = dict(req.query_params)
+@app.route("/downloadChunk/<int:rnum>")
+def download_chunk(rnum):
+    args = request.args
     token = "00000000" if "token" not in args else args["token"]
     if checkToken(rnum, "Down", token):
-        return Response(content=rnums[rnum].upload(args))
+        return rnums[rnum].upload(args)
     else:
         return {"status": "Access denied"}
 
 
-@app.get("/removeChunk/{rnum}")
-def remove_chunk(rnum: int, req: Request):
-    args = dict(req.query_params)
+@app.get("/removeChunk/<int:rnum>")
+def remove_chunk(rnum):
+    args = request.args
     token = "00000000" if "token" not in args else args["token"]
     if checkToken(rnum, "Down", token):
         findex = int(args.get("findex", -1))
@@ -489,35 +480,34 @@ def remove_chunk(rnum: int, req: Request):
     else:
         return {"status": "Access denied"}
 
-
-@app.get("/uploadawait/{rnum}")
-def upload_await(rnum: int, req: Request):
-    args = dict(req.query_params)
-    token = "00000000" if "token" not in args else args["token"]
+@app.route("/uploadawait/<int:rnum>")
+def upload_await(rnum):
+    json = request.args
+    token = "00000000" if "token" not in json else json["token"]
     if checkToken(rnum, "Up", token):
         return rnums[rnum].downloadawait()
     else:
         return {"status": "Access denied"}
 
 
-@app.post("/uploadChunk/{rnum}")
-async def upload_chunk(rnum: int, req: Request):
-    args = dict(req.query_params)
-    token = "00000000" if "token" not in args else args["token"]
+@app.route("/uploadChunk/<int:rnum>", methods=['GET', 'POST'])
+def upload_chunk(rnum):
+    json = request.args
+    token = "00000000" if "token" not in json else json["token"]
     if checkToken(rnum, "Up", token):
-        data = await req.body()
-        return rnums[rnum].downloadchunk(data, args)
+        data = request.data
+        return rnums[rnum].downloadchunk(data, json)
     else:
         return {"status": "Access denied"}
 
 
-@app.get("/directlink/{rnum}")
+@app.route("/directlink/<int:rnum>")
 def direct_download(rnum):
     tunnel = rnums[rnum]
     if tunnel.downloadtoken == "00000000":
         if tunnel.isUploaded():
             if tunnel.isDownloadable():
-                return responses.RedirectResponse(f"/directlink/{rnum}/{tunnel.filename}")
+                return redirect(f"/directlink/{rnum}/{tunnel.filename}")
             else:
                 return "Access denied: file is too big"
         else:
@@ -526,8 +516,8 @@ def direct_download(rnum):
         return {"status": "Access denied"}
 
 
-@app.get("/directlink/{rnum}/{filename}}")
-def direct_download2(rnum:int, filename:str):
+@app.route("/directlink/<int:rnum>/<string:filename>")
+def direct_download2(rnum, filename):
     tunnel = rnums[rnum]
     data = tunnel.directDownload()
     res = Response(data)
@@ -541,19 +531,19 @@ def direct_download2(rnum:int, filename:str):
 #####                       Service                         ######
 ##################################################################
 
-@app.get("/info/{rnum}")
-def info(rnum: int, req: Request):
-    args = dict(req.query_params)
+@app.route("/info/<int:rnum>")
+def info(rnum):
+    args = request.args
     info = rnums[rnum].getInfo(args)
     return info
 
 
-@app.get("/json/{rnum}")
-def json(rnum: int):
+@app.route("/json/<int:rnum>")
+def json(rnum):
     return rnums[rnum].json()
 
 
-@app.get("/clear")
+@app.route("/clear")
 def clear():
     rnums = getallrnums()
     for rnum in rnums:
@@ -561,7 +551,7 @@ def clear():
         del rnum
 
 
-@app.get("/gtrns")
+@app.route("/gtrns")
 def getallrnums():
     if rnums:
         return {"rnums": [k for k, v in rnums.items()]}
@@ -569,38 +559,36 @@ def getallrnums():
         return {"rnums": None}
 
 
-@app.get("/kill/{rnum}")
-def kill(rnum: int):
-    print(rnums[rnum].Hashes)
+@app.route("/kill/<int:rnum>")
+def kill(rnum):
     del rnums[rnum]
     return {"status": "ok"}
-
 
 ##################################################################
 #####                   DNUM REGISTR                        ######
 ##################################################################
 
-@app.get("/dreg")
+@app.route("/dreg")
 def dregistration():
     nums = list(map(str, range(10)))
     dnum = int("".join(random.sample(nums, 4)))
     while dnum in dnums:
         dnum = int("".join(random.sample(nums, 4)))
     dnums[dnum] = {}
-    return dnum
+    return str(dnum)
 
 
-@app.get("/sendRnum/{dnum}")
-def sendRnum(dnum: int, req: Request):
-    args = dict(req.query_params)
-    data = {"rnum": args["rnum"],
-            "server": args["server"]}
-    dnums[dnum] = data
+@app.route("/sendRnum/<int:dnum>")
+def sendRnum(dnum):
+    data = request.args
+    data2 = {"rnum": data["rnum"],
+            "server": data["server"]}
+    dnums[dnum] = data2
     return {"status": "ok"}
 
 
-@app.get("/awaitRnum/{dnum}")
-def awaitRnum(dnum: int):
+@app.route("/awaitRnum/<int:dnum>")
+def awaitRnum(dnum):
     start = time.time()
     while True:
         if time.time() - start > 25:
@@ -615,60 +603,52 @@ def awaitRnum(dnum: int):
 ##################################################################
 #####                     Token verivy                      ######
 ##################################################################
-@app.get("/gettoken")
+@app.route("/gettoken")
 def tokenregistration():
     nums = list(map(str, range(10)))
     token = int("".join(random.sample(nums, 8)))
     while str(token)[0] == "0":
         token = int("".join(random.sample(nums, 8)))
-    return token
+    return str(token)
 
 
-@app.get("/setuploadtoken")
-def setUploadToken(req: Request):
-    args = dict(req.query_params)
-    rnum, token = int(args["rnum"]), args["token"]
+@app.route("/setuploadtoken")
+def setUploadToken():
+    rnum, token = int(request.args["rnum"]), request.args["token"]
+    logging.warning(f"=====: {[(i, type(i)) for i in rnums.keys()]}")
+    logging.warning((rnum, type(rnum)))
     if rnums[rnum].uploadtoken != "00000000":
         return {"status": "Access denied"}
     rnums[rnum].uploadtoken = token
     return {"status": "Ok"}
 
 
-@app.get("/setdownloadtoken")
-def setDownloadToken(req: Request):
-    args = dict(req.query_params)
-    rnum, token = int(args["rnum"]), args["token"]
+@app.route("/setdownloadtoken")
+def setDownloadToken():
+    rnum, token = int(request.args["rnum"]), request.args["token"]
     if rnums[rnum].downloadtoken != "00000000":
         return {"status": "Access denied"}
     rnums[rnum].downloadtoken = token
     return {"status": "Ok"}
 
-
 ##################################################################
 #####                        VISUAL                         ######
 ##################################################################
+@app.route("/p2p")
+def mainpage():
+    return render_template("p2p.html", title="p2p")
 
 
-@app.get("/p2p", response_class=responses.HTMLResponse)
-def mainpage(request: Request):
-    return templates.TemplateResponse("p2p.html", {"request": request})
+@app.route("/download")
+def download():
+    return render_template("download.html", title="Download")
 
 
-@app.get("/download", response_class=responses.HTMLResponse)
-def download(request: Request):
-    return templates.TemplateResponse("download.html", {"request": request})
-
-
-@app.get("/upload", response_class=responses.HTMLResponse)
-def upload(request: Request):
-    return templates.TemplateResponse("upload.html", {"request": request})
-
-
-@app.get("/test")
-def test(req: Request):
-    return str(dict(req.query_params))
+@app.route("/upload")
+def upload():
+    return render_template("upload.html", title="Upload")
 
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host='0.0.0.0', port=port, reload=False)
+    app.run(host='0.0.0.0', port=port)
