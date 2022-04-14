@@ -1,7 +1,7 @@
-import socket
+import socket, os
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.bind(("", 8000))
+sock.bind(("", int(os.environ.get("PORT", 8000))))
 sock.listen(16)
 conn, addr = sock.accept()
 while True:
