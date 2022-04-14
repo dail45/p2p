@@ -21,7 +21,7 @@ Total_RAM = 480 * Mb
 
 
 REVISION = "2"
-VERSION = "26"
+VERSION = "26.1"
 
 
 @app.route("/")
@@ -120,7 +120,7 @@ class Tunnel:
             self.zipStream.updateFileHeaders(json)
         return self.log("start")
 
-    def androidInitAdapter(self, args):
+    def androidInitAdapter(self, json):
         self.url = json.get("url", None)
         self.type = "S2P" if self.url else "P2P"
         self.RAMErrorIgnore = int(json.get("ignoreRamError", 0))
