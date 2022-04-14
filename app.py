@@ -21,7 +21,7 @@ Total_RAM = 480 * Mb
 
 
 REVISION = "2"
-VERSION = "25.2"
+VERSION = "26"
 
 
 @app.route("/")
@@ -78,6 +78,8 @@ class Tunnel:
         """
         Принимает json, на его основе настраивает туннель.
         """
+        if "file_name" in json:
+            return self.androidInitAdapter(json)
         self.url = json.get("url", None)
         self.type = "S2P" if self.url else "P2P"
         self.RAMErrorIgnore = int(json.get("RAMErrorIgnore", 0))
@@ -103,6 +105,47 @@ class Tunnel:
         self.multifileFlag = int(json.get("multifile", 0))
         self.total_length = int(json.get("totallength", -1))
         self.total_lengths = json.get("totallengths", [-1])
+        if self.total_lengths != [-1]:
+            self.total_lengths = list(map(lambda x: int(x), ast.literal_eval(self.total_lengths)))
+        if self.total_length and self.total_length > 0:
+            self.total_chunks = math.ceil(self.total_length / self.chunksize)
+        if self.total_lengths != -1:
+            self.totals_chunks = list(map(lambda x: math.ceil(x / self.chunksize), self.total_lengths))
+        else:
+            self.totals_chunks = 0
+        self.start()
+        self.zipStream = None
+        if self.multifileFlag == 1:
+            self.zipStream = ZipStream(self)
+            self.zipStream.updateFileHeaders(json)
+        return self.log("start")
+
+    def androidInitAdapter(self, args):
+        self.url = json.get("url", None)
+        self.type = "S2P" if self.url else "P2P"
+        self.RAMErrorIgnore = int(json.get("ignoreRamError", 0))
+        RAM = int(json.get("ram", 64 * Mb))
+        if not self.RAMErrorIgnore:
+            mcheck = memoryCheck(RAM)
+            if mcheck is True:
+                self.RAM = RAM
+            else:
+                rnums[self.id] = None
+                del rnums[self.id]
+                return {"RamMemoryError": mcheck}
+        else:
+            self.RAM = RAM
+        self.threads = int(json.get("threads", 16))
+        self.chunksize = int(json.get("chunk_size", 4 * Mb))
+        self.filename = json.get("file_name", None)
+        self.filenames = json.get("file_names", None)
+        if self.filename and "/" in self.filename:
+            self.filename = self.filename.split("/")[-1]
+        if self.filenames:
+            self.filenames = list(map(lambda s: s.split("/")[-1] if "/" in s else s, ast.literal_eval(self.filenames)))
+        self.multifileFlag = int(json.get("multifile", 0))
+        self.total_length = int(json.get("file_size", -1))
+        self.total_lengths = json.get("file_sizes", [-1])
         if self.total_lengths != [-1]:
             self.total_lengths = list(map(lambda x: int(x), ast.literal_eval(self.total_lengths)))
         if self.total_length and self.total_length > 0:
@@ -371,6 +414,10 @@ class Tunnel:
         return {"status": "ok"}
 
     def getInfo(self, args):
+        "Если api = 1, то getInfo. Если api = 0, то androidAdapter"
+        api = int(args.get("api", 0))
+        if api == 0:
+            return self.androidGetInfoAdapter(args)
         if self.multifileFlag:
             if "multifile" in args:
                 if int(args["multifile"]) == 1:
@@ -390,6 +437,29 @@ class Tunnel:
             "filenames": self.filenames,
             "totallength": self.total_length,
             "totallengths": self.total_lengths,
+            "multifile": 1 if self.multifileFlag else 0
+        }
+
+    def androidGetInfoAdapter(self, args):
+        if self.multifileFlag:
+            if "multifile" in args:
+                if int(args["multifile"]) == 1:
+                    self.getMultifile = True
+            else:
+                self.filename = self.zipStream.getFileName()
+                self.total_length = self.zipStream.getTotalLength()
+        if "SecureRemoveChunks" in args:  # ToDo rename
+            self.SecureRemoveChunks = True if int(args["SecureRemoveChunks"]) == 1 else False
+        if "SecureDownloading" in args:  # ToDo rename
+            self.SecureDownloading = True if int(args["SecureDownloading"]) == 1 else False
+        return {
+            "chunk_size": self.chunksize,
+            "threads": self.threads,
+            "ram": self.RAM,
+            "file_name": self.filename,
+            "file_names": self.filenames,
+            "file_size": self.total_length,
+            "file_sizes": self.total_lengths,
             "multifile": 1 if self.multifileFlag else 0
         }
 
