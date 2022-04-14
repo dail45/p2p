@@ -21,7 +21,7 @@ Total_RAM = 480 * Mb
 
 
 REVISION = "2"
-VERSION = "26.1"
+VERSION = "26.2"
 
 
 @app.route("/")
@@ -415,7 +415,7 @@ class Tunnel:
 
     def getInfo(self, args):
         "Если api = 1, то getInfo. Если api = 0, то androidAdapter"
-        api = int(args.get("api", 0))
+        api = int(args.get("api", 1))
         if api == 0:
             return self.androidGetInfoAdapter(args)
         if self.multifileFlag:
