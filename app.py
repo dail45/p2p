@@ -9,6 +9,8 @@ from pathlib import Path
 import requests
 import threading
 from flask import Flask, request, render_template, Response, redirect
+
+from mailru import getUrl
 from zipStream import *
 
 
@@ -21,12 +23,25 @@ Total_RAM = 480 * Mb
 
 
 REVISION = "2"
-VERSION = "26.2"
+VERSION = "26.3"
+GitHubLink = "https://raw.githubusercontent.com/dail45/Updates/main/P2P.json"
 
 
 @app.route("/")
 def about():
     return f"p2p-tunnel{REVISION} v{VERSION}"
+
+
+@app.route("/p2p.exe")
+def get_p2p_exe():
+    res = requests.get(GitHubLink, verify=False).json()
+    url = getUrl(res["URL"])
+    data = requests.get(url, verify=False).content
+    res = Response(data)
+    res.headers["Content-Disposition"] = f"attachment; %20filename=p2p.exe"
+    res.headers["Content-Length"] = str(len(data))
+    res.headers["Content-Type"] = "multipart/form-data"
+    return res
 
 
 class Tunnel:
