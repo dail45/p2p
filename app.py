@@ -24,7 +24,7 @@ Total_RAM = 480 * Mb
 
 
 REVISION = "2"
-VERSION = "27"
+VERSION = "27.1"
 GitHubLink = "https://raw.githubusercontent.com/dail45/Updates/main/P2P.json"
 
 
@@ -641,10 +641,7 @@ def json(rnum):
 
 @app.route("/clear")
 def clear():
-    rnums = getallrnums()
-    for rnum in rnums:
-        del rnums[rnum]
-        del rnum
+    rnums.clear()
 
 
 @app.route("/gtrns")
