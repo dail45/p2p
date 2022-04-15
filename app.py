@@ -4,6 +4,7 @@ import logging
 import os
 import time
 import math
+import io
 import random
 from pathlib import Path
 import requests
@@ -23,7 +24,7 @@ Total_RAM = 480 * Mb
 
 
 REVISION = "2"
-VERSION = "26.3"
+VERSION = "27"
 GitHubLink = "https://raw.githubusercontent.com/dail45/Updates/main/P2P.json"
 
 
@@ -56,6 +57,7 @@ class Tunnel:
         self.STORAGE = {}
         self.STORAGELIST = []
         self.Hashes = {}
+        self.HashErrors = []
         self.RESERVED = []
         self.DOWNLOADED = 0
         self.UPLOADED = 0
@@ -333,7 +335,6 @@ class Tunnel:
 
     def getHash(self, findex, index):
         if self.SecureDownloading:
-            print("DEBUG:", self.getMultifile, self.multifileFlag)
             if self.getMultifile is True or not self.multifileFlag:
                 return f"{self.Hashes[(findex, index)]}"
             else:
@@ -341,7 +342,6 @@ class Tunnel:
         return None
 
     def removechunk(self, findex, index, forced=False):
-        print(f"Удаление... {self.SecureRemoveChunks} | {forced}")
         if self.SecureRemoveChunks is False or forced is True:
             if self.multifileFlag == 1:
                 if not self.getMultifile:
@@ -380,8 +380,7 @@ class Tunnel:
             return False
 
     "P2P Часть"
-    def downloadawait(self):
-
+    def downloadawait(self, json):
         """
         Проверяет количество доступной ОЗУ и возвращает различные статусы:
         alive -> Всё ок
@@ -389,6 +388,10 @@ class Tunnel:
         alive-timeout -> всё ещё живо, но время запроса истекает
         dead -> загрузка завершена
         """
+        findex, index = int(json.get("findex", -1)), int(json.get("index", -1))
+        if (findex, index) in self.HashErrors and (findex, index) != (-1, -1):
+            self.HashErrors.remove((findex, index))
+            return {"status": "again"}
         if self.checkDead():
             return {"status": "dead"}
         start = time.time()
@@ -409,6 +412,14 @@ class Tunnel:
         """
         Сохраняет data в памяти, json хранит информацию о индексе чанка и индексе файла.
         """
+        in_hash = str(hashlib.sha1(data).hexdigest())
+        hash = str(json.get("Hash", in_hash))
+        if in_hash != hash:
+            self.HashErrors.append(
+                (int(json["findex"], -1),
+                 int(json.get("index", -1)))
+            )
+            return {"status": "again"}
         index = int(json.get("index", -1))
         if self.multifileFlag == 0:
             findex = -1
@@ -425,7 +436,7 @@ class Tunnel:
                 self.STORAGE[findex] = {index + 1: data}
             self.STORAGELIST.append((findex, index))
             self.RESERVED.pop()
-        self.Hashes[(findex, index)] = hashlib.sha1(data).hexdigest()
+        self.Hashes[(findex, index)] = hash
         return {"status": "ok"}
 
     def getInfo(self, args):
@@ -553,7 +564,7 @@ def download_chunk(rnum):
         return {"status": "Access denied"}
 
 
-@app.get("/removeChunk/<int:rnum>")
+@app.route("/removeChunk/<int:rnum>")
 def remove_chunk(rnum):
     args = request.args
     token = "00000000" if "token" not in args else args["token"]
@@ -570,7 +581,7 @@ def upload_await(rnum):
     json = request.args
     token = "00000000" if "token" not in json else json["token"]
     if checkToken(rnum, "Up", token):
-        return rnums[rnum].downloadawait()
+        return rnums[rnum].downloadawait(json)
     else:
         return {"status": "Access denied"}
 
