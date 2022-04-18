@@ -24,13 +24,19 @@ Total_RAM = 480 * Mb
 
 
 REVISION = "2"
-VERSION = "27.1"
+VERSION = "28"
 GitHubLink = "https://raw.githubusercontent.com/dail45/Updates/main/P2P.json"
+ServerLiveToken = hashlib.sha1(bytes(int(time.time()))).hexdigest()
 
 
 @app.route("/")
 def about():
     return f"p2p-tunnel{REVISION} v{VERSION}"
+
+
+@app.route("/getServerLiveToken")
+def getServerLiveToken():
+    return ServerLiveToken
 
 
 @app.route("/p2p.exe")
