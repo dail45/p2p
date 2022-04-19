@@ -24,7 +24,7 @@ Total_RAM = 480 * Mb
 
 
 REVISION = "2"
-VERSION = "28"
+VERSION = "28.2"
 GitHubLink = "https://raw.githubusercontent.com/dail45/Updates/main/P2P.json"
 ServerLiveToken = hashlib.sha1(bytes(int(time.time()))).hexdigest()
 
@@ -101,7 +101,7 @@ class Tunnel:
         """
         Принимает json, на его основе настраивает туннель.
         """
-        if "file_name" in json:
+        if "chunk_size" in json:
             json = self.androidInitAdapter(json)
         self.url = json.get("url", None)
         self.type = "S2P" if self.url else "P2P"
