@@ -24,7 +24,7 @@ Total_RAM = 480 * Mb
 
 
 REVISION = "2"
-VERSION = "28.2"
+VERSION = "28.3"
 GitHubLink = "https://raw.githubusercontent.com/dail45/Updates/main/P2P.json"
 ServerLiveToken = hashlib.sha1(bytes(int(time.time()))).hexdigest()
 
@@ -146,8 +146,8 @@ class Tunnel:
     def androidInitAdapter(self, json):
         json.update({"totallength": json["total_length"]})
         json.update({"chunksize": "chunk_size"})
-        json.remove("chunk_size")
-        json.remove("total_length")
+        json.pop("chunk_size")
+        json.pop("total_length")
         return json
 
     def log(self, state):
