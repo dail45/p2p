@@ -10,7 +10,8 @@ from pathlib import Path
 import requests
 import threading
 from flask import Flask, request, render_template, Response, redirect
-
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from mailru import getUrl
 from zipStream import *
 
@@ -24,7 +25,7 @@ Total_RAM = 480 * Mb
 
 
 REVISION = "2"
-VERSION = "28.3"
+VERSION = "28.6"
 GitHubLink = "https://raw.githubusercontent.com/dail45/Updates/main/P2P.json"
 ServerLiveToken = hashlib.sha1(bytes(int(time.time()))).hexdigest()
 
@@ -195,7 +196,7 @@ class Tunnel:
         if self.type == "S2P":
             self.session = requests.Session()
             self.req = self.session.get(self.url, verify=False, stream=True, headers=self.headers)
-            self.sheaders = self.req.headers
+            self.sheaders = ast.literal_eval(str(self.req.headers))
             try:
                 self.total_length = int(self.sheaders["Content-Length"])
                 self.total_chunks = math.ceil(self.total_length / self.chunksize)
@@ -218,7 +219,10 @@ class Tunnel:
             while self.total_length > self.UPLOADED:
                 if len(self.STORAGE) * self.chunksize < self.RAM:
                     try:
-                        self.STORAGE[self.DOWNLOADED + 1] = next(self.r)
+                        data = next(self.r)
+                        hash = str(hashlib.sha1(data).hexdigest())
+                        self.Hashes[(-1, self.DOWNLOADED)] = hash
+                        self.STORAGE[self.DOWNLOADED + 1] = data
                         self.STORAGELIST.append(self.DOWNLOADED + 1)
                         self.DOWNLOADED += 1
                     except StopIteration:
