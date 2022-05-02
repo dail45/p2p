@@ -1,12 +1,8 @@
 import ast
-import hashlib
 import logging
-import os
-import time
-import math
 import io
+import os
 import random
-from pathlib import Path
 import requests
 import threading
 from flask import Flask, request, render_template, Response, redirect
@@ -23,9 +19,8 @@ Kb = 2 ** 10
 Mb = 2 ** 20
 Total_RAM = 480 * Mb
 
-
 REVISION = "2"
-VERSION = "28.6"
+VERSION = "29"
 GitHubLink = "https://raw.githubusercontent.com/dail45/Updates/main/P2P.json"
 ServerLiveToken = hashlib.sha1(bytes(int(time.time()))).hexdigest()
 
@@ -84,6 +79,7 @@ class Tunnel:
         self.SecureDownloading = False
         self.lock = threading.Lock()
         self.lock2 = threading.Lock()
+        self.lastactivity = time.time()
         self.headers = {
             "user-agent": "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36"}
 
@@ -97,6 +93,9 @@ class Tunnel:
         Устанавливает id для туннеля.
         """
         self.id = rnum
+
+    def activity(self):
+        self.lastactivity = time.time()
 
     def init(self, json):
         """
@@ -128,15 +127,19 @@ class Tunnel:
             self.filenames = list(map(lambda s: s.split("/")[-1] if "/" in s else s, ast.literal_eval(self.filenames)))
         self.multifileFlag = int(json.get("multifile", 0))
         self.total_length = int(json.get("totallength", -1))
+        total_length = self.total_length
         self.total_lengths = json.get("totallengths", [-1])
         if self.total_lengths != [-1]:
             self.total_lengths = list(map(lambda x: int(x), ast.literal_eval(self.total_lengths)))
+            total_length = sum(self.total_lengths)
         if self.total_length and self.total_length > 0:
             self.total_chunks = math.ceil(self.total_length / self.chunksize)
         if self.total_lengths != -1:
             self.totals_chunks = list(map(lambda x: math.ceil(x / self.chunksize), self.total_lengths))
         else:
             self.totals_chunks = 0
+        if self.RAM > total_length > 0:
+            self.RAM = math.ceil(total_length / self.chunksize) * self.chunksize
         self.start()
         self.zipStream = None
         if self.multifileFlag == 1:
@@ -209,6 +212,7 @@ class Tunnel:
             pass
 
     "S2P Часть"
+
     def S2Pdownloadgenerator(self):
         """
         Работает в потоке.
@@ -268,7 +272,7 @@ class Tunnel:
                 (self.multifileFlag == 1) and (
                 (self.getMultifile is True and self.UPLOADED <= sum(self.totals_chunks)
                 ) or (
-                self.getMultifile is False and self.zipStream.is_alive()))):
+                        self.getMultifile is False and self.zipStream.is_alive()))):
             if self.DOWNLOADED > self.UPLOADED or (self.multifileFlag == 1 and self.getMultifile is False and
                                                    self.zipStream.is_alive()):
                 if time.time() - start > 25:
@@ -276,7 +280,7 @@ class Tunnel:
                             "cnum": -1}
                 if len(self.STORAGELIST) > 0 or (self.multifileFlag == 1 and self.getMultifile is False and
                                                  self.zipStream.is_alive() and (len(self.zipStream.storage) > 0 or
-                                                 len(self.zipStream.STORAGE) > 0)):
+                                                                                len(self.zipStream.STORAGE) > 0)):
                     self.lock.acquire()
                     if self.multifileFlag == 0:
                         num = self.STORAGELIST.pop(0) - 1
@@ -356,6 +360,7 @@ class Tunnel:
             return False
 
     "P2P Часть"
+
     def downloadawait(self, json):
         """
         Проверяет количество доступной ОЗУ и возвращает различные статусы:
@@ -373,7 +378,8 @@ class Tunnel:
         start = time.time()
         while (len(self.STORAGELIST) + len(self.RESERVED) + 1) * self.chunksize > self.RAM:
             if time.time() - start > 25:
-                return {"status": "alive-timeout", "data": [(len(self.STORAGELIST) + len(self.RESERVED) + 1) * self.chunksize, self.RAM]}
+                return {"status": "alive-timeout",
+                        "data": [(len(self.STORAGELIST) + len(self.RESERVED) + 1) * self.chunksize, self.RAM]}
             if self.checkDead():
                 return {"status": "dead"}
             time.sleep(0.005)
@@ -466,7 +472,23 @@ class Tunnel:
         }
 
 
+def clearTrash():
+    to_remove = []
+    for k, v in rnums.items():
+        activity = time.time() - v.lastactivity
+        up, down = v.UPLOADED, v.DOWNLOADED
+        ram = v.RAM
+        if ram == 0:
+            continue
+        if down == 0 and activity > 60:
+            to_remove.append((k, v))
+            continue
+    for k, v in to_remove:
+        del rnums[k]
+
+
 def memoryCheck(RAM):
+    clearTrash()
     sum_RAM = 0
     for k, v in rnums.items():
         sum_RAM += v.RAM
@@ -498,10 +520,10 @@ def registration():
         rnum = int("".join(random.sample(nums, 4)))
     rnums[rnum] = Tunnel()
     rnums[rnum].setrnum(rnum)
+    rnums[rnum].activity()
     logging.warning(f"=====: {rnums.keys()}")
     time.sleep(0.05)
     return str(rnum)
-
 
 
 @app.route("/start/<int:rnum>", methods=['GET', 'POST'])
@@ -514,6 +536,7 @@ def start(rnum):
     args.update(json)
     token = "00000000" if "token" not in args else args["token"]
     if checkToken(rnum, "Up", token):
+        rnums[rnum].activity()
         log = rnums[rnum].init(args)
     else:
         log = {"status": "Access denied"}
@@ -525,6 +548,7 @@ def await_chunk(rnum):
     json = request.args
     token = "00000000" if "token" not in json else json["token"]
     if checkToken(rnum, "Down", token):
+        rnums[rnum].activity()
         return rnums[rnum].uploadawait()
     else:
         return {"status": "Access denied"}
@@ -535,6 +559,7 @@ def download_chunk(rnum):
     args = request.args
     token = "00000000" if "token" not in args else args["token"]
     if checkToken(rnum, "Down", token):
+        rnums[rnum].activity()
         return rnums[rnum].upload(args)
     else:
         return {"status": "Access denied"}
@@ -545,6 +570,7 @@ def remove_chunk(rnum):
     args = request.args
     token = "00000000" if "token" not in args else args["token"]
     if checkToken(rnum, "Down", token):
+        rnums[rnum].activity()
         findex = int(args.get("findex", -1))
         index = int(args["index"])
         rnums[rnum].removechunk(findex, index, True)
@@ -552,11 +578,13 @@ def remove_chunk(rnum):
     else:
         return {"status": "Access denied"}
 
+
 @app.route("/uploadawait/<int:rnum>")
 def upload_await(rnum):
     json = request.args
     token = "00000000" if "token" not in json else json["token"]
     if checkToken(rnum, "Up", token):
+        rnums[rnum].activity()
         return rnums[rnum].downloadawait(json)
     else:
         return {"status": "Access denied"}
@@ -567,6 +595,7 @@ def upload_chunk(rnum):
     json = request.args
     token = "00000000" if "token" not in json else json["token"]
     if checkToken(rnum, "Up", token):
+        rnums[rnum].activity()
         data = request.data
         return rnums[rnum].downloadchunk(data, json)
     else:
@@ -579,6 +608,7 @@ def direct_download(rnum):
     if tunnel.downloadtoken == "00000000":
         if tunnel.isUploaded():
             if tunnel.isDownloadable():
+                rnums[rnum].activity()
                 return redirect(f"/directlink/{rnum}/{tunnel.filename}")
             else:
                 return "Access denied: file is too big"
@@ -599,12 +629,14 @@ def direct_download2(rnum, filename):
     kill(rnum)
     return res
 
+
 ##################################################################
 #####                       Service                         ######
 ##################################################################
 
 @app.route("/info/<int:rnum>")
 def info(rnum):
+    rnums[rnum].activity()
     args = request.args
     info = rnums[rnum].getInfo(args)
     return info
@@ -612,6 +644,7 @@ def info(rnum):
 
 @app.route("/json/<int:rnum>")
 def json(rnum):
+    rnums[rnum].activity()
     return rnums[rnum].json()
 
 
@@ -630,8 +663,10 @@ def getallrnums():
 
 @app.route("/kill/<int:rnum>")
 def kill(rnum):
+    rnums[rnum].activity()
     del rnums[rnum]
     return {"status": "ok"}
+
 
 ##################################################################
 #####                   DNUM REGISTR                        ######
@@ -651,7 +686,7 @@ def dregistration():
 def sendRnum(dnum):
     data = request.args
     data2 = {"rnum": data["rnum"],
-            "server": data["server"]}
+             "server": data["server"]}
     dnums[dnum] = data2
     return {"status": "ok"}
 
@@ -669,6 +704,7 @@ def awaitRnum(dnum):
                     "data": data}
         time.sleep(0.05)
 
+
 ##################################################################
 #####                     Token verivy                      ######
 ##################################################################
@@ -684,6 +720,7 @@ def tokenregistration():
 @app.route("/setuploadtoken")
 def setUploadToken():
     rnum, token = int(request.args["rnum"]), request.args["token"]
+    rnums[rnum].activity()
     logging.warning(f"=====: {[(i, type(i)) for i in rnums.keys()]}")
     logging.warning((rnum, type(rnum)))
     if rnums[rnum].uploadtoken != "00000000":
@@ -695,10 +732,12 @@ def setUploadToken():
 @app.route("/setdownloadtoken")
 def setDownloadToken():
     rnum, token = int(request.args["rnum"]), request.args["token"]
+    rnums[rnum].activity()
     if rnums[rnum].downloadtoken != "00000000":
         return {"status": "Access denied"}
     rnums[rnum].downloadtoken = token
     return {"status": "Ok"}
+
 
 ##################################################################
 #####                        VISUAL                         ######
